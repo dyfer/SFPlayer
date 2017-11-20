@@ -1,0 +1,6 @@
+(
+	\name: 		"SFPlayer",
+	\path: 		"SFPlayer",
+	\summary:	"SoundFile Player",
+	\author: 	"Joshua Parmenter",
+)
