@@ -1,0 +1,158 @@
+class:: SFPlayer
+summary:: A soundfile player
+categories:: UGens>InOut, UGens>Buffer, GUI>Interfaces
+related:: Classes/VDiskIn, Classes/SoundFileView
+
+
+DESCRIPTION::
+SFPlayer plays sound files directly from disk. It also has a convenient GUI.
+
+CLASSMETHODS::
+
+METHOD:: new
+
+ARGUMENT:: path
+The path (complete or relative) to a soundfile. If no path is specified specified, an Open Dialog will be shown to choose the file.
+
+ARGUMENT:: outbus
+The bus to output to
+
+ARGUMENT:: server
+The server to use
+
+ARGUMENT:: skin
+
+
+INSTANCEMETHODS::
+
+
+METHOD:: gui
+Show a GUI of the SFPlayer
+
+ARGUMENT:: argBounds
+Bounds
+
+ARGUMENT:: doneAction
+Action to be performed after opening the window
+
+returns:: this SFPlayer
+
+
+METHOD:: drawCues
+
+METHOD:: skin
+
+METHOD:: stopGUIRoutine
+
+METHOD:: offset
+
+ARGUMENT:: newOffset
+
+METHOD:: cues
+
+METHOD:: sf
+
+METHOD:: startTime
+
+ARGUMENT:: newStartTime
+
+METHOD:: loadBuffer
+
+ARGUMENT:: bufsize
+
+ARGUMENT:: startTime
+
+METHOD:: stop
+
+ARGUMENT:: updateStart
+
+METHOD:: path
+
+METHOD:: pause
+
+METHOD:: playGUIRoutine
+
+METHOD:: addCue
+
+ARGUMENT:: key
+
+ARGUMENT:: time
+
+ARGUMENT:: sort
+
+ARGUMENT:: redraw
+
+METHOD:: saveCues
+
+ARGUMENT:: path
+
+METHOD:: amp
+
+ARGUMENT:: newAmp
+
+METHOD:: pausePlay
+
+METHOD:: runSetup
+
+METHOD:: playFromCue
+
+ARGUMENT:: key
+
+ARGUMENT:: idx
+
+METHOD:: loadCues
+
+ARGUMENT:: path
+
+METHOD:: reset
+
+METHOD:: play
+
+ARGUMENT:: bufsize
+
+ARGUMENT:: addAction
+
+ARGUMENT:: target
+
+METHOD:: sortCues
+
+METHOD:: hideCues
+
+METHOD:: initSFPlayer
+
+ARGUMENT:: argSkin
+
+METHOD:: outbus
+
+ARGUMENT:: newOut
+
+ARGUMENT:: updateMenu
+
+METHOD:: removeCue
+
+ARGUMENT:: key
+
+ARGUMENT:: sort
+
+ARGUMENT:: redraw
+
+METHOD:: window
+
+METHOD:: buildSD
+
+METHOD:: playPaused
+
+EXAMPLES::
+
+code::
+p = SFPlayer.new; //shows open file dialog
+
+//specify the file
+p = SFPlayer.new(Platform.resourceDir +/+ "sounds/a11wlk01.wav");
+p.play;
+p.stop;
+p.gui;
+
+// opens gui after choosing the file
+p = SFPlayer.new.gui;
+::
