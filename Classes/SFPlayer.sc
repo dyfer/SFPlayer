@@ -4,6 +4,7 @@ SFPlayer {
 	var <amp, isPlaying, wasPlaying, hasGUI, <startTime, timeString, sfView, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
+	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction;
 
 	*new {arg path, outbus, server, skin;
 		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
@@ -15,11 +16,14 @@ SFPlayer {
 		server.serverRunning.not({server.boot});
 		offset = 0;
 		path.isNil.if({
+			openFilePending = true;
 			Dialog.getPaths({arg paths;
 				path = paths[0];
+				openFilePending = false;
 				this.runSetup;
 				})
 			}, {
+			openFilePending = false;
 			this.runSetup;
 			})
 		}
@@ -37,7 +41,11 @@ SFPlayer {
 		wasPlaying = false;
 		hasGUI = false;
 		startTime = 0.0;
-		}
+		if(openGUIafterLoading, {
+			this.gui(tempBounds, tempAction);
+			openGUIafterLoading = false;
+		});
+	}
 
 	buildSD {
 		SynthDef("SFPlayer"++sf.numChannels, {arg gate = 1, buffer, amp = 1, outbus;
@@ -136,17 +144,22 @@ SFPlayer {
 
 	gui {arg argBounds, doneAction;
 		var ampSpec, wasPlaying;
-		ampSpec = [-90, 12].asSpec;
-		bounds = argBounds ?? {Rect(200, 200, 980, 600)};
-		window = Window(path.basename, bounds);
-		window.view.background_(skin.background);
-		window.onClose_({isPlaying.if({this.stop}); hasGUI = false});
-		hasGUI = true;
-		timeString = StaticText(window, Rect(20, 16, 300, 68))
+		if(openFilePending, {
+			tempBounds = argBounds;
+			tempAction = doneAction;
+			openGUIafterLoading = true;
+		}, {
+			ampSpec = [-90, 12].asSpec;
+			bounds = argBounds ?? {Rect(200, 200, 980, 600)};
+			window = Window(path.basename, bounds);
+			window.view.background_(skin.background);
+			window.onClose_({isPlaying.if({this.stop}); hasGUI = false});
+			hasGUI = true;
+			timeString = StaticText(window, Rect(20, 16, 300, 68))
 			.font_(Font("Arial", 72))
 			.stringColor_(skin.string)
 			.string_(startTime.asTimeString[3..10]);
-		sfView = SoundFileView.new(window, Rect(20, 100, 900, 400))
+			sfView = SoundFileView.new(window, Rect(20, 100, 900, 400))
 			.canFocus_(false)
 			.soundfile_(sf)
 			.timeCursorColor_(skin.sfCursor)
@@ -160,25 +173,25 @@ SFPlayer {
 			.mouseDownAction_({this.pausePlay})
 			.mouseUpAction_({this.playPaused})
 			.timeCursorPosition_(0 / sf.duration);
-		// Play / Pause button
-		playButton = Button.new(window, Rect(310, 10, 120, 20))
+			// Play / Pause button
+			playButton = Button.new(window, Rect(310, 10, 120, 20))
 			.states_([
 				[">", skin.string, skin.background],
 				["||", skin.string, skin.background]])
 			.focus(true)
 			.action_({arg button;
 				[{this.pause}, {this.play(65536 * 8)}][button.value].value;
-				});
-		Button.new(window, Rect(310, 40, 120, 20))
+			});
+			Button.new(window, Rect(310, 40, 120, 20))
 			.states_([
 				["[]", skin.string, skin.background]])
 			.canFocus_(false)
 			.action_({this.stop});
-		Button.new(window, Rect(310, 70, 120, 20))
+			Button.new(window, Rect(310, 70, 120, 20))
 			.states_([
 				["Scope On", skin.string, skin.background],
 				["Scope Off", skin.string, skin.background]
-				])
+			])
 			.canFocus_(false)
 			.action_({arg button;
 				(server == Server.internal).if({
@@ -186,46 +199,46 @@ SFPlayer {
 						{scope.window.close},
 						{scope = server.scope(sf.numChannels, outbus)}
 					][button.value].value;
-					}, {
+				}, {
 					button.value_(0)
-					})
-				});
-		StaticText(window, Rect(450, 10, 60, 20))
+				})
+			});
+			StaticText(window, Rect(450, 10, 60, 20))
 			.string_("Outbus")
 			.stringColor_(skin.string);
-		outMenu = PopUpMenu(window, Rect(510, 10, 60, 20))
+			outMenu = PopUpMenu(window, Rect(510, 10, 60, 20))
 			.items_(server.options.numAudioBusChannels.collect({arg i; i.asString}))
 			.value_(outbus ?? {0})
 			.action_({arg menu; this.outbus_(menu.value, false); playButton.focus(true)})
 			.stringColor_( skin.string );
-		StaticText(window, Rect(580, 10, 120, 20))
+			StaticText(window, Rect(580, 10, 120, 20))
 			.string_("Amplitude (in db)")
 			.stringColor_( skin.string);
-		ampSlider = Slider(window, Rect(580, 40, 200, 20))
+			ampSlider = Slider(window, Rect(580, 40, 200, 20))
 			.value_(ampSpec.unmap(amp))
 			.canFocus_(false)
 			.action_({arg me;
 				this.amp_(ampSpec.map(me.value).round(0.1).dbamp);
 				ampNumber.value_(ampSpec.map(me.value).round(0.1))
-				});
-		ampNumber = NumberBox(window, Rect(700, 10, 80, 20))
+			});
+			ampNumber = NumberBox(window, Rect(700, 10, 80, 20))
 			.value_(amp.ampdb)
 			.action_({arg me;
 				this.amp_(me.value.dbamp);
 				ampSlider.value_(ampSpec.unmap(me.value);
-	 			playButton.focus(true));
-				});
-		Button.new(window, Rect(580, 70, 120, 20))
+					playButton.focus(true));
+			});
+			Button.new(window, Rect(580, 70, 120, 20))
 			.states_([
 				["Reset", skin.string, skin.background]
 			])
 			.canFocus_(false)
 			.action_({this.reset});
-		/* cues */
-		StaticText(window, Rect(20, 510, 120, 20))
+			/* cues */
+			StaticText(window, Rect(20, 510, 120, 20))
 			.string_("Play From Cue:")
 			.stringColor_( skin.string);
-		cueMenu = PopUpMenu(window, Rect(150, 510, 250, 20))
+			cueMenu = PopUpMenu(window, Rect(150, 510, 250, 20))
 			.items_(cues.asArray)
 			.stringColor_(skin.string)
 			.canFocus_(false)
@@ -233,7 +246,7 @@ SFPlayer {
 			.mouseDownAction_({arg view;
 				isPlaying.if({wasPlaying = true;this.stop});
 				view.value_(0)
-				})
+			})
 			.action_({arg thisMenu;
 				var idx;
 				idx = thisMenu.value - 1;
@@ -244,16 +257,16 @@ SFPlayer {
 				});
 				wasPlaying.if({this.play; wasPlaying = false;})
 			});
-		StaticText(window, Rect(20, 540, 120, 20))
+			StaticText(window, Rect(20, 540, 120, 20))
 			.string_("Cue offset:")
 			.stringColor_(skin.string);
-		cueOffsetNum = NumberBox(window, Rect(150, 540, 120, 20))
+			cueOffsetNum = NumberBox(window, Rect(150, 540, 120, 20))
 			.value_(0)
 			.action_({arg thisBox;
 				this.offset_(thisBox.value);
 				playButton.focus(true)
 			});
-		Button(window, Rect(410, 510, 120, 20))
+			Button(window, Rect(410, 510, 120, 20))
 			.states_([
 				["Load cues", skin.string, skin.background]
 			])
@@ -261,7 +274,7 @@ SFPlayer {
 			.action_({
 				this.loadCues
 			});
-		Button(window, Rect(540, 510, 120, 20))
+			Button(window, Rect(540, 510, 120, 20))
 			.states_([
 				["Save cues", skin.string, skin.background]
 			])
@@ -269,7 +282,7 @@ SFPlayer {
 			.action_({
 				this.saveCues
 			});
-		Button(window, Rect(410, 540, 120, 20))
+			Button(window, Rect(410, 540, 120, 20))
 			.states_([
 				["Hide cues",  skin.string, skin.background],
 				["Show cues",  skin.string, skin.background]
@@ -282,10 +295,10 @@ SFPlayer {
 					this.hideCues
 				})
 			});
-		StaticText(window, Rect(670, 510, 120, 20))
+			StaticText(window, Rect(670, 510, 120, 20))
 			.string_("Add cues ([\\key, val])")
 			.stringColor_(skin.string);
-		TextField(window, Rect(800, 510, 120, 20))
+			TextField(window, Rect(800, 510, 120, 20))
 			.action_({arg me;
 				var vals;
 				vals = me.string.interpret;
@@ -304,10 +317,10 @@ SFPlayer {
 				});
 				playButton.focus(true);
 			});
-		StaticText(window, Rect(670, 540, 120, 20))
+			StaticText(window, Rect(670, 540, 120, 20))
 			.string_("Remove cues ([\\key])")
 			.stringColor_(skin.string);
-		TextField(window, Rect(800, 540, 120, 20))
+			TextField(window, Rect(800, 540, 120, 20))
 			.action_({arg me;
 				var vals;
 				vals = me.string.interpret;
@@ -322,7 +335,8 @@ SFPlayer {
 				this.sortCues;
 				playButton.focus(true);
 			});
-		window.front;
+			window.front;
+		});
 	}
 
 	pausePlay {
