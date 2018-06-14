@@ -1,7 +1,7 @@
 SFPlayer {
 	var <path, <outbus, server, bufnum, <sf, cond, curNode, curTime;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber;
-	var <amp, isPlaying, wasPlaying, hasGUI, <startTime, timeString, sfView, guiRoutine;
+	var <amp, isPlaying, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
 	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction;
@@ -13,29 +13,39 @@ SFPlayer {
 	initSFPlayer {arg argSkin;
 		skin = argSkin ?? {SFPlayerSkin.default};
 		server = server ?? Server.default;
-		server.serverRunning.not({server.boot});
+		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
 		path.isNil.if({
 			openFilePending = true;
-			Dialog.getPaths({arg paths;
-				path = paths[0];
+			// Dialog.getPaths({arg paths;
+			Dialog.openPanel({arg paths;
+				// path = paths[0];
+				path = paths;
 				openFilePending = false;
 				this.runSetup;
-				})
-			}, {
+			})
+		}, {
 			openFilePending = false;
 			this.runSetup;
-			})
-		}
+		})
+	}
 
 	runSetup {
 		sf = SoundFile.new;
 		{sf.openRead(path)}.try({"Soundfile could not be opened".warn});
-		sf.close;
 		cond = Condition.new;
+		if(server.options.numOutputBusChannels < sf.numChannels, {
+			if(server.serverRunning.not, { //if server is not running, set the number of output channels
+				format("%: setting server's options.numOutputBusChannels to %", this.class.name, sf.numChannels).postln;
+				server.options.numOutputBusChannels_(sf.numChannels);
+			}, {
+				format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
+			})
+		});
 		server.waitForBoot({
 			this.buildSD;
-			});
+		});
+		sf.close;
 		amp = 1;
 		isPlaying = false;
 		wasPlaying = false;
