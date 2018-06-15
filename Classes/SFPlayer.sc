@@ -164,11 +164,13 @@ SFPlayer {
 		amp = newAmp;
 		isPlaying.if({
 			server.sendMsg(\n_set, curNode, \amp, amp)
-			});
+		});
 		hasGUI.if({
-			ampNumber.valueAction_(newAmp.ampdb);
-			})
-		}
+			// ampNumber.valueAction_(newAmp.ampdb);
+			ampNumber.value_(newAmp.ampdb);
+			ampSlider.value_(ampSpec.unmap(newAmp.ampdb));
+		})
+	}
 
 	startTime_ {arg newStartTime;
 		startTime = (newStartTime + offset).max(0).min(sf.duration);
@@ -181,7 +183,7 @@ SFPlayer {
 		}
 
 	gui {arg argBounds, doneAction;
-		var ampSpec, wasPlaying;
+		var wasPlaying;
 		if(openFilePending, {
 			tempBounds = argBounds;
 			tempAction = doneAction;
@@ -256,6 +258,7 @@ SFPlayer {
 			.value_(ampSpec.unmap(amp))
 			.canFocus_(false)
 			.action_({arg me;
+				me.value.postln;
 				this.amp_(ampSpec.map(me.value).round(0.1).dbamp);
 				ampNumber.value_(ampSpec.map(me.value).round(0.1))
 			});
