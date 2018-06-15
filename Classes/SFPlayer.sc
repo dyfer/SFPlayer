@@ -10,7 +10,7 @@ SFPlayer {
 
 	*new {arg path, outbus, server, skin;
 		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
-		}
+	}
 
 	initSFPlayer {arg argSkin;
 		skin = argSkin ?? {SFPlayerSkin.default};
@@ -81,7 +81,7 @@ SFPlayer {
 		bufsize = bufsize * sf.numChannels;
 		server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
 			[\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
-		}
+	}
 
 	bufsize {^bufsizeVar}
 	bufsize_ {arg val; bufsizeVar = val}
@@ -111,24 +111,24 @@ SFPlayer {
 				this.loadBuffer(bufsizeVar, startTime);
 				server.sync(cond);
 				// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
-					// curNode = server.nodeAllocator.alloc(1), addAction, target,
-					// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
+				// curNode = server.nodeAllocator.alloc(1), addAction, target,
+				// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
 				curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
 				curNode = curSynth.nodeID;
 				isPlaying = true;
 				hasGUI.if({
 					this.playGUIRoutine
-					})
 				})
 			})
-		}
+		})
+	}
 
 	pause {
 		isPlaying.if({
 			this.stop( false );
 			this.startTime_( curTime );
-			})
-		}
+		})
+	}
 
 	stop {arg updateStart = true;
 		var oldbufnum;
@@ -141,24 +141,24 @@ SFPlayer {
 			SystemClock.sched(0.2, {
 				server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
 				server.bufferAllocator.free(oldbufnum)
-				});
+			});
 			isPlaying = false;
 			updateStart.if({{this.startTime_(lastStart)}.defer(0.1)});
 			hasGUI.if({
 				{playButton.value_(0)}.defer;
-				})
 			})
-		}
+		})
+	}
 
 	outbus_ {arg newOut, updateMenu = true;
 		outbus = newOut;
 		isPlaying.if({
 			server.sendMsg(\n_set, curNode, \outbus, outbus);
-			});
+		});
 		(hasGUI and: {updateMenu}).if({
 			outMenu.value_(outbus)
-			})
-		}
+		})
+	}
 
 	amp_ {arg newAmp;
 		amp = newAmp;
@@ -179,8 +179,8 @@ SFPlayer {
 			timeString.string_(startTime.asTimeString[3..10]);
 			cueOffsetNum.value_(0);
 			offset = 0;
-			})
-		}
+		})
+	}
 
 	gui {arg argBounds, doneAction;
 		var wasPlaying;
@@ -384,18 +384,18 @@ SFPlayer {
 		isPlaying.if({
 			wasPlaying = true;
 			this.stop;
-			});
-		}
+		});
+	}
 
 	playPaused {
 		startTime = sfView.timeCursorPosition / sf.sampleRate;
 		wasPlaying.if({
 			this.play;
 			wasPlaying = false;
-			}, {
+		}, {
 			timeString.string_(startTime.asTimeString[3..10]);
-			})
-		}
+		})
+	}
 
 	playGUIRoutine {
 		guiRoutine = Routine.run({
@@ -403,26 +403,26 @@ SFPlayer {
 			now = Main.elapsedTime;
 			loop({
 				curTime = (((Main.elapsedTime - now) * rateVar) + startTime);
-					{
-						hasGUI.if({
-							sfView.timeCursorPosition_(curTime * sf.sampleRate);
-							timeString.string_(curTime.round(0.01).asTimeString[3..10]);
-							})
-						}.defer;
+				{
+					hasGUI.if({
+						sfView.timeCursorPosition_(curTime * sf.sampleRate);
+						timeString.string_(curTime.round(0.01).asTimeString[3..10]);
+					})
+				}.defer;
 				0.1.wait;
-				})
 			})
-		}
+		})
+	}
 
 	stopGUIRoutine {
 		guiRoutine.stop;
-		}
+	}
 
 	addCue {arg key, time, sort = true, redraw = true;
 		(time < sf.duration).if({
-//			(cues.notNil and: {cues[key].notNil}).if({
-//				this.removeCue(key, false, false);
-//			});
+			//			(cues.notNil and: {cues[key].notNil}).if({
+			//				this.removeCue(key, false, false);
+			//			});
 			cues = cues.add([key, time]);
 		}, {
 			"You tried to add a cue past the end of the soundfile".warn;
@@ -560,7 +560,7 @@ SFPlayer {
 SFPlayerSkin {
 	classvar <>default;
 	var <>string, <>background, <>sfBackground, <>sfWaveform, <>sfCursor,
-		<>cueLabel, <>cueLine;
+	<>cueLabel, <>cueLine;
 
 	*new {arg string, background, sfBackground, sfWaveform, sfCursor, cueLabel, cueLine;
 		^super.newCopyArgs(string, background, sfBackground, sfWaveform,
