@@ -1,10 +1,12 @@
 SFPlayer {
-	var <path, <outbus, server, bufnum, <sf, cond, curNode, curTime;
+	var <path, <outbus, server, bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber;
 	var <amp, isPlaying, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
-	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction;
+	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction, <>duplicateSingleChannel = true;
+	var <ampSpec;
+	var rateVar, addActionVar, targetVar, bufsizeVar;
 
 	*new {arg path, outbus, server, skin;
 		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
@@ -13,6 +15,10 @@ SFPlayer {
 	initSFPlayer {arg argSkin;
 		skin = argSkin ?? {SFPlayerSkin.default};
 		server = server ?? Server.default;
+		rateVar = 1;
+		addActionVar = 0;
+		targetVar = 1;
+		bufsizeVar = 65536 * 8;
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
 		path.isNil.if({
@@ -58,18 +64,18 @@ SFPlayer {
 	}
 
 	buildSD {
-		SynthDef("SFPlayer"++sf.numChannels, {arg gate = 1, buffer, amp = 1, outbus;
+		synthName = "SFPlayer"++sf.numChannels;
+		SynthDef(synthName, {arg gate = 1, buffer, amp = 1, rate = 1, outbus;
 			var diskin;
-			diskin = VDiskIn.ar(sf.numChannels, buffer,
-				BufSampleRate.kr(buffer) / SampleRate.ir);
-			(sf.numChannels == 1).if({
+			diskin = VDiskIn.ar(sf.numChannels, buffer, (BufSampleRate.kr(buffer) / SampleRate.ir) * rate);
+			((sf.numChannels == 1) && duplicateSingleChannel).if({
 				diskin = diskin.dup
-				});
+			});
 			Out.ar(outbus, diskin *
 				EnvGen.kr(Env([0, 1, 0], [0.02, 0.02], \sin, 1), gate, doneAction: 2) *
 				Lag.kr(amp, 0.1))
-			}).send(server)
-		}
+		}).add;
+	}
 
 	loadBuffer {arg bufsize = 65536, startTime = 0;
 		bufsize = bufsize * sf.numChannels;
@@ -77,17 +83,38 @@ SFPlayer {
 			[\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
 		}
 
-	play {arg bufsize = 65536 * 8, addAction = 0, target = 1;
-		(isPlaying.not and: {startTime < sf.duration}).if({
+	bufsize {^bufsizeVar}
+	bufsize_ {arg val; bufsizeVar = val}
+
+	addAction  {^addActionVar}
+	addAction_ {arg val; addActionVar = val}
+
+	target {^targetVar}
+	target_ {arg val; targetVar = val} //add switching target?
+
+	rate {^rateVar}
+	rate_ {arg val;
+		rateVar = val;
+		curSynth.set(\rate, rateVar);
+	}
+
+	play {arg bufsize, addAction, target, rate;
+		bufsize !? {bufsizeVar = bufsize};
+		addAction !? {addActionVar = addAction};
+		target !? {targetVar = target};
+		rate !? {rateVar = rate};
+		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil).if({
 			Routine.run({
 				clock = TempoClock.new;
 				lastStart = startTime;
 				clock.sched(sf.duration - startTime + 0.1, {this.stop});
-				this.loadBuffer(bufsize, startTime);
+				this.loadBuffer(bufsizeVar, startTime);
 				server.sync(cond);
-				server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
-					curNode = server.nodeAllocator.alloc(1), addAction, target,
-					\buffer, bufnum, \amp, amp, \outbus, outbus);
+				// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
+					// curNode = server.nodeAllocator.alloc(1), addAction, target,
+					// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
+				curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
+				curNode = curSynth.nodeID;
 				isPlaying = true;
 				hasGUI.if({
 					this.playGUIRoutine
@@ -107,7 +134,8 @@ SFPlayer {
 		var oldbufnum;
 		isPlaying.if({
 			clock.stop;
-			server.sendMsg(\n_set, curNode, \gate, 0);
+			// server.sendMsg(\n_set, curNode, \gate, 0);
+			curSynth.release;
 			oldbufnum = bufnum;
 			this.stopGUIRoutine;
 			SystemClock.sched(0.2, {
@@ -190,7 +218,7 @@ SFPlayer {
 				["||", skin.string, skin.background]])
 			.focus(true)
 			.action_({arg button;
-				[{this.pause}, {this.play(65536 * 8)}][button.value].value;
+				[{this.pause}, {this.play}][button.value].value;
 			});
 			Button.new(window, Rect(310, 40, 120, 20))
 			.states_([
@@ -371,7 +399,7 @@ SFPlayer {
 			var now;
 			now = Main.elapsedTime;
 			loop({
-				curTime = ((Main.elapsedTime - now) + startTime);
+				curTime = (((Main.elapsedTime - now) * rateVar) + startTime);
 					{
 						hasGUI.if({
 							sfView.timeCursorPosition_(curTime * sf.sampleRate);
