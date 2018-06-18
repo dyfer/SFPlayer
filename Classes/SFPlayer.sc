@@ -195,187 +195,234 @@ SFPlayer {
 			window.view.background_(skin.background);
 			window.onClose_({isPlaying.if({this.stop}); hasGUI = false});
 			hasGUI = true;
-			timeString = StaticText(window, Rect(20, 16, 300, 68))
-			.font_(Font("Arial", 72))
-			.stringColor_(skin.string)
-			.string_(startTime.asTimeString[3..10]);
-			sfView = SoundFileView.new(window, Rect(20, 100, 900, 400))
-			.canFocus_(false)
-			.soundfile_(sf)
-			.timeCursorColor_(skin.sfCursor)
-			.readWithTask(0, sf.numFrames
-				, block: 64,
-				doneAction: {window.front; doneAction.value})
-			.gridOn_(false)
-			.timeCursorOn_(true)
-			.background_(skin.sfBackground)
-			.waveColors_(Array.fill(sf.numChannels, skin.sfWaveform))
-			.mouseDownAction_({this.pausePlay})
-			.mouseUpAction_({this.playPaused})
-			.timeCursorPosition_(0 / sf.duration);
-			// Play / Pause button
-			playButton = Button.new(window, Rect(310, 10, 120, 20))
-			.states_([
-				[">", skin.string, skin.background],
-				["||", skin.string, skin.background]])
-			.focus(true)
-			.action_({arg button;
-				[{this.pause}, {this.play}][button.value].value;
-			});
-			Button.new(window, Rect(310, 40, 120, 20))
-			.states_([
-				["[]", skin.string, skin.background]])
-			.canFocus_(false)
-			.action_({this.stop});
-			Button.new(window, Rect(310, 70, 120, 20))
-			.states_([
-				["Scope On", skin.string, skin.background],
-				["Scope Off", skin.string, skin.background]
-			])
-			.canFocus_(false)
-			.action_({arg button;
-				(server == Server.internal).if({
+			window.view.layout_(
+				VLayout(
+					HLayout(
+						timeString = StaticText(window)
+						.font_(Font("Arial", 72))
+						.stringColor_(skin.string)
+						.string_(startTime.asTimeString[3..10])
+						.fixedWidth_(300),
+						VLayout(
+							// Play / Pause button
+							playButton = Button.new(window)
+							.states_([
+								[">", skin.string, skin.background],
+								["||", skin.string, skin.background]])
+							.focus(true)
+							.action_({arg button;
+								[{this.pause}, {this.play}][button.value].value;
+							})
+							.minWidth_(120),
+							Button.new(window, Rect(310, 40, 120, 20))
+							.states_([
+								["[]", skin.string, skin.background]])
+							.canFocus_(false)
+							.action_({this.stop}),
+							Button.new(window, Rect(310, 70, 120, 20))
+							.states_([
+								["Scope On", skin.string, skin.background],
+								["Scope Off", skin.string, skin.background]
+							])
+							.canFocus_(false)
+							.action_({arg button;
+								(server == Server.internal).if({
+									[
+										{scope.window.close},
+										{scope = server.scope(sf.numChannels, outbus)}
+									][button.value].value;
+								}, {
+									button.value_(0)
+								})
+							})
+						).margins_([10, 0, 0, 10]),
+						VLayout(
+							HLayout(
+								StaticText(window)
+								.string_("Outbus")
+								.stringColor_(skin.string),
+								outMenu = PopUpMenu(window)
+								.items_(server.options.numAudioBusChannels.collect({arg i; i.asString}))
+								.value_(outbus ?? {0})
+								.action_({arg menu; this.outbus_(menu.value, false); playButton.focus(true)})
+								.stringColor_( skin.string )
+							),
+							nil,
+						).margins_([10, 0, 0, 10]), //outbus
+						VLayout(
+							HLayout(
+								StaticText(window)
+								.string_("Amplitude (in db)")
+								.stringColor_( skin.string),
+								ampNumber = NumberBox(window)
+								.value_(amp.ampdb)
+								.action_({arg me;
+									this.amp_(me.value.dbamp);
+									ampSlider.value_(ampSpec.unmap(me.value);
+										playButton.focus(true));
+								}).maxWidth_(60),
+								nil
+							),
+							ampSlider = Slider(window)
+							.value_(ampSpec.unmap(amp))
+							.canFocus_(false)
+							.orientation_(\horizontal)
+							.action_({arg me;
+								this.amp_(ampSpec.map(me.value).round(0.1).dbamp);
+								ampNumber.value_(ampSpec.map(me.value).round(0.1))
+							})
+							.fixedSize_(240@24),
+							HLayout(
+								Button.new(window)
+								.states_([
+									["Reset", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({this.reset}),
+								nil
+							)
+						).margins_([10, 0, 0, 10]), //amp etc
+						[nil, stretch: 2], //empty space on the right
+					), //end of top section with time, play/stop, amp etc
+
 					[
-						{scope.window.close},
-						{scope = server.scope(sf.numChannels, outbus)}
-					][button.value].value;
-				}, {
-					button.value_(0)
-				})
-			});
-			StaticText(window, Rect(450, 10, 60, 20))
-			.string_("Outbus")
-			.stringColor_(skin.string);
-			outMenu = PopUpMenu(window, Rect(510, 10, 60, 20))
-			.items_(server.options.numAudioBusChannels.collect({arg i; i.asString}))
-			.value_(outbus ?? {0})
-			.action_({arg menu; this.outbus_(menu.value, false); playButton.focus(true)})
-			.stringColor_( skin.string );
-			StaticText(window, Rect(580, 10, 120, 20))
-			.string_("Amplitude (in db)")
-			.stringColor_( skin.string);
-			ampSlider = Slider(window, Rect(580, 40, 200, 20))
-			.value_(ampSpec.unmap(amp))
-			.canFocus_(false)
-			.action_({arg me;
-				me.value.postln;
-				this.amp_(ampSpec.map(me.value).round(0.1).dbamp);
-				ampNumber.value_(ampSpec.map(me.value).round(0.1))
-			});
-			ampNumber = NumberBox(window, Rect(700, 10, 80, 20))
-			.value_(amp.ampdb)
-			.action_({arg me;
-				this.amp_(me.value.dbamp);
-				ampSlider.value_(ampSpec.unmap(me.value);
-					playButton.focus(true));
-			});
-			Button.new(window, Rect(580, 70, 120, 20))
-			.states_([
-				["Reset", skin.string, skin.background]
-			])
-			.canFocus_(false)
-			.action_({this.reset});
-			/* cues */
-			StaticText(window, Rect(20, 510, 120, 20))
-			.string_("Play From Cue:")
-			.stringColor_( skin.string);
-			cueMenu = PopUpMenu(window, Rect(150, 510, 250, 20))
-			.items_(cues.asArray)
-			.stringColor_(skin.string)
-			.canFocus_(false)
-			.mouseUpAction_({"MouseUp".postln;})
-			.mouseDownAction_({arg view;
-				isPlaying.if({wasPlaying = true;this.stop});
-				view.value_(0)
-			})
-			.action_({arg thisMenu;
-				var idx;
-				idx = thisMenu.value - 1;
-				(idx >= 0).if({
-					this.playFromCue(cues[idx][0], idx);
-				}, {
-					this.playFromCue(\none, -1)
-				});
-				wasPlaying.if({this.play; wasPlaying = false;})
-			});
-			StaticText(window, Rect(20, 540, 120, 20))
-			.string_("Cue offset:")
-			.stringColor_(skin.string);
-			cueOffsetNum = NumberBox(window, Rect(150, 540, 120, 20))
-			.value_(0)
-			.action_({arg thisBox;
-				this.offset_(thisBox.value);
-				playButton.focus(true)
-			});
-			Button(window, Rect(410, 510, 120, 20))
-			.states_([
-				["Load cues", skin.string, skin.background]
-			])
-			.canFocus_(false)
-			.action_({
-				this.loadCues
-			});
-			Button(window, Rect(540, 510, 120, 20))
-			.states_([
-				["Save cues", skin.string, skin.background]
-			])
-			.canFocus_(false)
-			.action_({
-				this.saveCues
-			});
-			Button(window, Rect(410, 540, 120, 20))
-			.states_([
-				["Hide cues",  skin.string, skin.background],
-				["Show cues",  skin.string, skin.background]
-			])
-			.canFocus_(false)
-			.action_({arg button;
-				(button.value == 0).if({
-					this.drawCues
-				}, {
-					this.hideCues
-				})
-			});
-			StaticText(window, Rect(670, 510, 120, 20))
-			.string_("Add cues ([\\key, val])")
-			.stringColor_(skin.string);
-			TextField(window, Rect(800, 510, 120, 20))
-			.action_({arg me;
-				var vals;
-				vals = me.string.interpret;
-				vals.isKindOf(Array).if({
-					vals = vals.flat.clump(2);
-				}, {
-					vals = vals.asArray.flat.clump(2)
-				});
-				vals[0].isKindOf(Array).if({
-					vals.do({arg thisPair;
-						this.addCue(thisPair[0], thisPair[1], false)
-					});
-					this.sortCues;
-				}, {
-					this.addCue(vals[0], vals[1], true)
-				});
-				playButton.focus(true);
-			});
-			StaticText(window, Rect(670, 540, 120, 20))
-			.string_("Remove cues ([\\key])")
-			.stringColor_(skin.string);
-			TextField(window, Rect(800, 540, 120, 20))
-			.action_({arg me;
-				var vals;
-				vals = me.string.interpret;
-				vals.isKindOf(Array).if({
-					vals = vals.flat;
-				}, {
-					vals = vals.asArray
-				});
-				vals.do({arg thisKey;
-					this.removeCue(thisKey, false)
-				});
-				this.sortCues;
-				playButton.focus(true);
-			});
+						sfView = SoundFileView.new(window)
+						.canFocus_(false)
+						.soundfile_(sf)
+						.timeCursorColor_(skin.sfCursor)
+						.readWithTask(0, sf.numFrames
+							, block: 64,
+							doneAction: {window.front; doneAction.value})
+						.gridOn_(false)
+						.timeCursorOn_(true)
+						.background_(skin.sfBackground)
+						.waveColors_(Array.fill(sf.numChannels, skin.sfWaveform))
+						.mouseDownAction_({this.pausePlay})
+						.mouseUpAction_({this.playPaused})
+						.timeCursorPosition_(0 / sf.duration),
+						stretch: 10
+					],
+
+					//bottom secion
+					/* cues */
+					HLayout(
+						GridLayout.rows(
+							[
+								StaticText(window)
+								.string_("Play From Cue:")
+								.stringColor_( skin.string),
+								[
+									cueMenu = PopUpMenu(window)
+									.items_(cues.asArray)
+									.stringColor_(skin.string)
+									.canFocus_(false)
+									.mouseUpAction_({"MouseUp".postln;})
+									.mouseDownAction_({arg view;
+										isPlaying.if({wasPlaying = true;this.stop});
+										view.value_(0)
+									})
+									.action_({arg thisMenu;
+										var idx;
+										idx = thisMenu.value - 1;
+										(idx >= 0).if({
+											this.playFromCue(cues[idx][0], idx);
+										}, {
+											this.playFromCue(\none, -1)
+										});
+										wasPlaying.if({this.play; wasPlaying = false;})
+									})
+									.minWidth_(300),
+									columns: 2
+								],
+								Button(window)
+								.states_([
+									["Load cues", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({
+									this.loadCues
+								}),
+								Button(window)
+								.states_([
+									["Save cues", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({
+									this.saveCues
+								}),
+								StaticText(window)
+								.string_("Add cues ([\\key, val])")
+								.stringColor_(skin.string),
+								TextField(window)
+								.action_({arg me;
+									var vals;
+									vals = me.string.interpret;
+									vals.isKindOf(Array).if({
+										vals = vals.flat.clump(2);
+									}, {
+										vals = vals.asArray.flat.clump(2)
+									});
+									vals[0].isKindOf(Array).if({
+										vals.do({arg thisPair;
+											this.addCue(thisPair[0], thisPair[1], false)
+										});
+										this.sortCues;
+									}, {
+										this.addCue(vals[0], vals[1], true)
+									});
+									playButton.focus(true);
+								}),
+								// [nil, rows: 2, stretch: 1]
+							], [
+								StaticText(window)
+								.string_("Cue offset:")
+								.stringColor_(skin.string),
+								cueOffsetNum = NumberBox(window)
+								.value_(0)
+								.action_({arg thisBox;
+									this.offset_(thisBox.value);
+									playButton.focus(true)
+								})
+								.maxWidth_(60),
+								nil,
+								Button(window)
+								.states_([
+									["Hide cues",  skin.string, skin.background],
+									["Show cues",  skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({arg button;
+									(button.value == 0).if({
+										this.drawCues
+									}, {
+										this.hideCues
+									})
+								}),
+								nil,
+								StaticText(window)
+								.string_("Remove cues ([\\key])")
+								.stringColor_(skin.string),
+								TextField(window)
+								.action_({arg me;
+									var vals;
+									vals = me.string.interpret;
+									vals.isKindOf(Array).if({
+										vals = vals.flat;
+									}, {
+										vals = vals.asArray
+									});
+									vals.do({arg thisKey;
+										this.removeCue(thisKey, false)
+									});
+									this.sortCues;
+									playButton.focus(true);
+								})
+							]
+						).hSpacing_(12).vSpacing_(4),
+						[nil, stretch: 1]
+					)
+				)
+			);
 			window.front;
 		});
 	}
@@ -507,13 +554,16 @@ SFPlayer {
 				menuItems = cues.collect({arg thisCue;
 					var key, time, nTabs;
 					(thisCue[0].asString.size > 6).if({
-						nTabs = "\t\t"
+						// nTabs = "\t\t"
+						nTabs = "\t"
 					}, {
-						nTabs = "\t\t\t"
+						// nTabs = "\t\t\t"
+						nTabs = "\t"
 					});
 					thisCue[0].asString + nTabs + thisCue[1].asTimeString;
 				});
-				cueMenu.items_(["None" + "\t\t\t" + 0.asTimeString] ++ menuItems);
+				// cueMenu.items_(["None" + "\t\t\t" + 0.asTimeString] ++ menuItems);
+				cueMenu.items_(["None" + "\t" + 0.asTimeString] ++ menuItems);
 				window.refresh;
 			})
 		})
