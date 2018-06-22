@@ -1,13 +1,13 @@
 SFPlayer {
 	var <path, <outbus, <server, <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
-	var <window, bounds, outMenu, playButton, ampSlider, ampNumber;
+	var <window, bounds, outMenu, playButton, ampSlider, ampNumber, targetText, addActionMenu;
 	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
 	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction, <>duplicateSingleChannel = true;
 	var <ampSpec;
 	var rateVar, addActionVar, targetVar, bufsizeVar;
-	var <>switchTargetWhilePlaying = false;
+	var <>switchTargetWhilePlaying = true;
 
 	*new {arg path, outbus, server, skin;
 		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
@@ -41,6 +41,19 @@ SFPlayer {
 		})
 	}
 
+	getAddActionsArray {
+		^Node.addActions.select({|key, val| val.asString.size > 1}).getPairs.clump(2).sort({|a, b| a[1] < b[1]}).flop[0]
+	}
+
+	getAddActionIndex {arg addActionArg; //from name or number; this is probably not foolproof...
+		if(addActionArg.isKindOf(SimpleNumber), {
+			^addActionArg;
+		}, {
+			//assume name
+			^Node.addActions.select({|key, val| val.postln.asString.containsi(addActionArg.asString)}).asArray[0];
+		})
+	}
+
 	runSetup {
 		sf = SoundFile.new;
 		{sf.openRead(path)}.try({"Soundfile could not be opened".warn});
@@ -49,9 +62,10 @@ SFPlayer {
 			if(server.serverRunning.not, { //if server is not running, set the number of output channels
 				format("%: setting server's options.numOutputBusChannels to %", this.class.name, sf.numChannels).postln;
 				server.options.numOutputBusChannels_(sf.numChannels);
+
 			}, {
 				format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
-			})
+			});
 		});
 		server.waitForBoot({
 			this.buildSD;
@@ -106,10 +120,11 @@ SFPlayer {
 		this.changed(\target, val, switchTargetWhilePlaying);
 		if(isPlaying && switchTargetWhilePlaying, {
 			Node.actionNumberFor(this.addAction).switch(
-				0, {curSynth.moveToHead(this.target)}, //head
-				1, {curSynth.moveToTail(this.target)}, //tail
-				2, {curSynth.moveBefore(this.target)}, //before
-				3, {curSynth.moveAfter(this.target)}, //after
+				0, {curSynth.moveToHead(this.target.asTarget)}, //head
+				1, {curSynth.moveToTail(this.target.asTarget)}, //tail
+				2, {curSynth.moveBefore(this.target.asTarget)}, //before
+				3, {curSynth.moveAfter(this.target.asTarget)}, //after
+				4, {format("%: can't replace % while playing", this.class.name, this.target.asTarget).warn}, //replace
 			)
 		});
 	}
@@ -270,6 +285,26 @@ SFPlayer {
 								.value_(outbus ?? {0})
 								.action_({arg menu; this.outbus_(menu.value, false); playButton.focus(true)})
 								.stringColor_( skin.string )
+							),
+							HLayout(
+								StaticText(window)
+								.string_("addAction")
+								.stringColor_(skin.string),
+								addActionMenu = PopUpMenu(window)
+								.items_(this.getAddActionsArray)
+								.value_(this.getAddActionIndex(this.addAction))
+								.action_({arg menu; this.addAction_(menu.value); playButton.focus(true)})
+								.stringColor_( skin.string )
+							),
+							HLayout(
+								StaticText(window)
+								.string_("Target")
+								.stringColor_(skin.string),
+								targetText = TextField(window)
+								.value_(this.target.asString)
+								.action_({arg menu; this.target_(menu.value.interpret); playButton.focus(true)})
+								.stringColor_( skin.string )
+								.maxWidth_(80)
 							),
 							nil,
 						).margins_([10, 0, 0, 10]), //outbus
@@ -640,7 +675,8 @@ SFPlayer {
 		// ": ".post; args.postln;
 		{
 			what.switch(
-				\addAction, {},
+				\addAction, {if(hasGUI, {addActionMenu.value_(this.getAddActionIndex(value))})},
+				\target, {if(hasGUI, {targetText.value_(value.asNodeID.asString)})},
 				\amp, {
 					hasGUI.if({
 						if(args[1] != \number, {
