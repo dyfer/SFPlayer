@@ -1,5 +1,5 @@
 SFPlayer {
-	var <path, <outbus, server, bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
+	var <path, <outbus, <server, <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber;
 	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
@@ -22,6 +22,7 @@ SFPlayer {
 		// addActionVar = 0;
 		// targetVar = 1;
 		this.target_(1);
+		outbus ?? {this.outbus_(0)};
 		bufsizeVar = 65536 * 8;
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
@@ -253,14 +254,10 @@ SFPlayer {
 							])
 							.canFocus_(false)
 							.action_({arg button;
-								(server == Server.internal).if({
-									[
-										{scope.window.close},
-										{scope = server.scope(sf.numChannels, outbus)}
-									][button.value].value;
-								}, {
-									button.value_(0)
-								})
+								[
+									{scope.window.close},
+									{scope = server.scope(sf.numChannels, outbus)}
+								][button.value].value;
 							})
 						).margins_([10, 0, 0, 10]),
 						VLayout(
