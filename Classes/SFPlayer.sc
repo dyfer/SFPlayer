@@ -1,5 +1,6 @@
 SFPlayer {
-	var <path, <outbus, <server, <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
+	var <path, <outbus, <server, <>autoSetSampleRate, <>autoSetOutputChannels;
+	var <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber, targetText, addActionMenu;
 	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
@@ -9,8 +10,8 @@ SFPlayer {
 	var rateVar, addActionVar, targetVar, bufsizeVar;
 	var <>switchTargetWhilePlaying = true;
 
-	*new {arg path, outbus, server, skin;
-		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
+	*new {arg path, outbus, server, skin, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
+		^super.newCopyArgs(path, outbus, server, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
 	}
 
 	initSFPlayer {arg argSkin;
@@ -59,7 +60,7 @@ SFPlayer {
 		{sf.openRead(path)}.try({"Soundfile could not be opened".warn});
 		cond = Condition.new;
 		if(server.options.numOutputBusChannels < sf.numChannels, {
-			if(server.serverRunning.not, { //if server is not running, set the number of output channels
+			if(server.serverRunning.not && autoSetOutputChannels, { //if server is not running, set the number of output channels
 				format("%: setting server's options.numOutputBusChannels to %", this.class.name, sf.numChannels).postln;
 				server.options.numOutputBusChannels_(sf.numChannels);
 
@@ -67,7 +68,7 @@ SFPlayer {
 				format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
 			});
 		});
-		if(server.serverRunning.not && server.options.sampleRate.isNil, { //also set the samplerate if server is not running
+		if(server.serverRunning.not && server.options.sampleRate.isNil && autoSetSampleRate, { //also set the samplerate if server is not running
 			//and sampleRate too rate too
 			format("%: setting server's options.sampleRate to %", this.class.name, sf.sampleRate).postln;
 			server.options.sampleRate_(sf.sampleRate);
