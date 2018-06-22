@@ -1,12 +1,13 @@
 SFPlayer {
 	var <path, <outbus, server, bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber;
-	var <amp, isPlaying, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
+	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
 	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction, <>duplicateSingleChannel = true;
 	var <ampSpec;
 	var rateVar, addActionVar, targetVar, bufsizeVar;
+	var <>switchTargetWhilePlaying = false;
 
 	*new {arg path, outbus, server, skin;
 		^super.newCopyArgs(path, outbus, server).initSFPlayer(skin);
@@ -15,9 +16,12 @@ SFPlayer {
 	initSFPlayer {arg argSkin;
 		skin = argSkin ?? {SFPlayerSkin.default};
 		server = server ?? Server.default;
-		rateVar = 1;
-		addActionVar = 0;
-		targetVar = 1;
+		this.rate_(1);
+		// rateVar = 1;
+		this.addAction_(0);
+		// addActionVar = 0;
+		// targetVar = 1;
+		this.target_(1);
 		bufsizeVar = 65536 * 8;
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
@@ -87,15 +91,33 @@ SFPlayer {
 	bufsize_ {arg val; bufsizeVar = val}
 
 	addAction  {^addActionVar}
-	addAction_ {arg val; addActionVar = val}
+	addAction_ {arg val;
+		// val = Node.addActions[val];
+		val !? {
+			addActionVar = val;
+			this.changed(\addAction, this.addAction);
+		};
+	}
 
 	target {^targetVar}
-	target_ {arg val; targetVar = val} //add switching target?
+	target_ {arg val;
+		targetVar = val;
+		this.changed(\target, val, switchTargetWhilePlaying);
+		if(isPlaying && switchTargetWhilePlaying, {
+			Node.actionNumberFor(this.addAction).switch(
+				0, {curSynth.moveToHead(this.target)}, //head
+				1, {curSynth.moveToTail(this.target)}, //tail
+				2, {curSynth.moveBefore(this.target)}, //before
+				3, {curSynth.moveAfter(this.target)}, //after
+			)
+		});
+	}
 
 	rate {^rateVar}
 	rate_ {arg val;
 		rateVar = val;
 		curSynth.set(\rate, rateVar);
+		this.changed(\rate, this.rate);
 	}
 
 	play {arg bufsize, addAction, target, rate;
@@ -116,9 +138,10 @@ SFPlayer {
 				curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
 				curNode = curSynth.nodeID;
 				isPlaying = true;
-				hasGUI.if({
-					this.playGUIRoutine
-				})
+				this.changed(\isPlaying, this.isPlaying);
+				// hasGUI.if({
+				// this.playGUIRoutine
+			// })
 			})
 		})
 	}
@@ -137,16 +160,17 @@ SFPlayer {
 			// server.sendMsg(\n_set, curNode, \gate, 0);
 			curSynth.release;
 			oldbufnum = bufnum;
-			this.stopGUIRoutine;
+			// this.stopGUIRoutine;
+			isPlaying = false;
+			this.changed(\isPlaying, this.isPlaying, updateStart);
 			SystemClock.sched(0.2, {
 				server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
 				server.bufferAllocator.free(oldbufnum)
 			});
-			isPlaying = false;
 			updateStart.if({{this.startTime_(lastStart)}.defer(0.1)});
-			hasGUI.if({
-				{playButton.value_(0)}.defer;
-			})
+			// hasGUI.if({
+			// 	{playButton.value_(0)}.defer;
+			// })
 		})
 	}
 
@@ -155,31 +179,34 @@ SFPlayer {
 		isPlaying.if({
 			server.sendMsg(\n_set, curNode, \outbus, outbus);
 		});
-		(hasGUI and: {updateMenu}).if({
-			outMenu.value_(outbus)
-		})
+		this.changed(\outbus, outbus, updateMenu);
+		// (hasGUI and: {updateMenu}).if({
+		// 	outMenu.value_(outbus)
+		// })
 	}
 
-	amp_ {arg newAmp;
+	amp_ {arg newAmp, source; //source: \number, \slider or none
 		amp = newAmp;
 		isPlaying.if({
 			server.sendMsg(\n_set, curNode, \amp, amp)
 		});
-		hasGUI.if({
-			// ampNumber.valueAction_(newAmp.ampdb);
-			ampNumber.value_(newAmp.ampdb);
-			ampSlider.value_(ampSpec.unmap(newAmp.ampdb));
-		})
+		this.changed(\amp, amp, source);
+		// hasGUI.if({
+		// 	// ampNumber.valueAction_(newAmp.ampdb);
+		// 	ampNumber.value_(newAmp.ampdb);
+		// 	ampSlider.value_(ampSpec.unmap(newAmp.ampdb));
+		// })
 	}
 
 	startTime_ {arg newStartTime;
 		startTime = (newStartTime + offset).max(0).min(sf.duration);
-		hasGUI.if({
-			sfView.timeCursorPosition_((startTime * sf.sampleRate).round);
-			timeString.string_(startTime.asTimeString[3..10]);
-			cueOffsetNum.value_(0);
-			offset = 0;
-		})
+		this.changed(\startTime, startTime);
+		// hasGUI.if({
+		// 	sfView.timeCursorPosition_((startTime * sf.sampleRate).round);
+		// 	timeString.string_(startTime.asTimeString[3..10]);
+		// 	cueOffsetNum.value_(0);
+		// 	offset = 0;
+		// })
 	}
 
 	gui {arg argBounds, doneAction;
@@ -257,9 +284,10 @@ SFPlayer {
 								ampNumber = NumberBox(window)
 								.value_(amp.ampdb)
 								.action_({arg me;
-									this.amp_(me.value.dbamp);
-									ampSlider.value_(ampSpec.unmap(me.value);
-										playButton.focus(true));
+									this.amp_(me.value.dbamp, \number);
+									// ampSlider.value_(ampSpec.unmap(me.value);
+									// playButton.focus(true));
+									playButton.focus(true);
 								}).maxWidth_(60),
 								nil
 							),
@@ -268,8 +296,8 @@ SFPlayer {
 							.canFocus_(false)
 							.orientation_(\horizontal)
 							.action_({arg me;
-								this.amp_(ampSpec.map(me.value).round(0.1).dbamp);
-								ampNumber.value_(ampSpec.map(me.value).round(0.1))
+								this.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
+								// ampNumber.value_(ampSpec.map(me.value).round(0.1))
 							})
 							.fixedSize_(240@24),
 							HLayout(
@@ -424,6 +452,8 @@ SFPlayer {
 				)
 			);
 			window.front;
+			this.addDependant(this);
+			window.onClose_({this.removeDependant(this)});
 		});
 	}
 
@@ -603,6 +633,53 @@ SFPlayer {
 			this.startTime_(0);
 			this.amp_(1);
 		}.defer(0.11)
+	}
+
+	update {arg who, what ...args;
+		var value = args[0];
+		// args[0] is the value
+		// "update fired, what: ".post;
+		// what.post;
+		// ": ".post; args.postln;
+		{
+			what.switch(
+				\addAction, {},
+				\amp, {
+					hasGUI.if({
+						if(args[1] != \number, {
+						ampNumber.value_(value.ampdb.round(0.1));
+						}, {"not updating number".postln;});
+						if(args[1] != \slider, {
+							ampSlider.value_(ampSpec.unmap(value.ampdb));
+						});
+					})
+				},
+				\outbus, {
+					var updMenu = args[1];
+					(hasGUI && updMenu).if({
+						outMenu.value_(value)
+					})
+				},
+				\isPlaying, {
+					if(hasGUI, {
+						if(value, {
+							this.playGUIRoutine;
+						}, {
+							this.stopGUIRoutine;
+							playButton.value_(0);
+						})
+					})
+				},
+				\startTime, {
+					hasGUI.if({
+						sfView.timeCursorPosition_((startTime * sf.sampleRate).round);
+						timeString.string_(startTime.asTimeString[3..10]);
+						cueOffsetNum.value_(0);
+						offset = 0;
+					})
+				}
+			)
+		}.defer;
 	}
 
 }
