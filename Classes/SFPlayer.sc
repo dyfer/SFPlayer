@@ -2,7 +2,7 @@ SFPlayer {
 	var <path, <outbus, <server, <>autoSetSampleRate, <>autoSetOutputChannels;
 	var <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber, targetText, addActionMenu;
-	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, guiRoutine;
+	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, <cuesView, <gridView, <timeGrid, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
 	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction, <>duplicateSingleChannel = true;
@@ -232,7 +232,6 @@ SFPlayer {
 	}
 
 	gui {arg argBounds, doneAction;
-		var wasPlaying;
 		if(openFilePending, {
 			tempBounds = argBounds;
 			tempAction = doneAction;
@@ -242,7 +241,17 @@ SFPlayer {
 			bounds = argBounds ?? {Rect(200, 200, 980, 600)};
 			window = Window(path.basename, bounds);
 			window.view.background_(skin.background);
-			window.onClose_({isPlaying.if({this.stop}); hasGUI = false});
+			window.view.mouseDownAction_({arg view, x, y, modifiers, buttonNumber, clickCount;
+				var sfBounds = sfView.bounds;
+				if((x <= sfBounds.left) && (y >= sfBounds.top) && (y <= sfBounds.bottom), {
+					if(this.isPlaying.not, {this.startTime_(0)});
+				});
+			});// set startTime to 0 when clicking to the left of the soundfileview
+			timeGrid = DrawGrid(nil, ControlSpec(0, sf.duration, units: \s).grid, nil);
+			timeGrid.fontColor_(skin.string);
+			timeGrid.font_(Font("Arial", 10));
+			timeGrid.gridColors_([skin.string, nil]);
+			window.onClose_({isPlaying.if({this.stop}); hasGUI = false; this.removeDependant(this)});
 			hasGUI = true;
 			window.view.layout_(
 				VLayout(
@@ -350,22 +359,46 @@ SFPlayer {
 						).margins_([10, 0, 0, 10]), //amp etc
 						[nil, stretch: 2], //empty space on the right
 					), //end of top section with time, play/stop, amp etc
-
 					[
-						sfView = SoundFileView.new(window)
-						.canFocus_(false)
-						.soundfile_(sf)
-						.timeCursorColor_(skin.sfCursor)
-						.readWithTask(0, sf.numFrames
-							, block: 64,
-							doneAction: {window.front; doneAction.value})
-						.gridOn_(false)
-						.timeCursorOn_(true)
-						.background_(skin.sfBackground)
-						.waveColors_(Array.fill(sf.numChannels, skin.sfWaveform))
-						.mouseDownAction_({this.pausePlay})
-						.mouseUpAction_({this.playPaused})
-						.timeCursorPosition_(0 / sf.duration),
+						VLayout(
+							[
+								StackLayout(
+									cuesView = UserView(window).acceptsMouse_(false),
+									sfView = SoundFileView.new(window)
+									.canFocus_(false)
+									.soundfile_(sf)
+									.timeCursorColor_(skin.sfCursor)
+									.readWithTask(0, sf.numFrames
+										, block: 64,
+										doneAction: {window.front; doneAction.value})
+									.gridOn_(false)
+									.timeCursorOn_(true)
+									.background_(skin.sfBackground)
+									.waveColors_(Array.fill(sf.numChannels, skin.sfWaveform))
+									.mouseDownAction_({this.pausePlay})
+									.mouseUpAction_({this.playPaused})
+									.mouseMoveAction_({arg view;
+										var scrollRatio = view.viewFrames/ sf.numFrames;
+										var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * sf.duration;
+										var end = start + (scrollRatio * sf.duration);
+										var grid = timeGrid.x.grid;
+										grid.spec.minval_(start);
+										grid.spec.maxval_(end);
+										timeGrid.horzGrid_(grid);
+										gridView.refresh;
+										cuesView.refresh;
+									})
+									.timeCursorPosition_(0 / sf.duration),
+								).mode_(\stackAll),
+								stretch: 10
+							],
+							gridView = UserView()
+							.drawFunc_({|view|
+								timeGrid.bounds = Rect(0, 0, view.bounds.width, view.bounds.height);
+								timeGrid.draw;
+							})
+							.minHeight_(12)
+						).margins_([0, 0, 0, 0]).spacing_(0),
 						stretch: 10
 					],
 
@@ -491,7 +524,6 @@ SFPlayer {
 			);
 			window.front;
 			this.addDependant(this);
-			window.onClose_({this.removeDependant(this)});
 		});
 	}
 
@@ -590,8 +622,8 @@ SFPlayer {
 
 	hideCues {
 		hasGUI.if({
-			window.drawHook_({});
-			window.refresh;
+			cuesView.drawFunc_({});
+			cuesView.refresh;
 		});
 	}
 
@@ -599,25 +631,36 @@ SFPlayer {
 		var points, menuItems, nTabs, inc;
 		cues.notNil.if({
 			hasGUI.if({
+				var drawPointsArr;
 				this.sortCues;
 				points = cues.collect({arg thisCue;
 					thisCue[1];
 				});
-				points = points / sf.duration * 900 + 20;
-				window.drawHook_({
-					Pen.font_(Font("Helvetica", 14));
+				drawPointsArr = Array.new(points.size);
+				cuesView.drawFunc_({|view|
+					var scaledPoints, spec;
+					spec = timeGrid.x.grid.spec;
+					drawPointsArr = points.collect({arg pt;
+						(pt >= spec.minval) && (pt <= spec.maxval)
+					});
+					scaledPoints = points.collect({arg pt; spec.unmap(pt) * view.bounds.width});
+					Pen.font_(Font("Helvetica", 16));
 					Pen.strokeColor_(skin.cueLine);
-					points.do({arg thisPoint, i;
-						Pen.moveTo(thisPoint @ 100);
-						Pen.lineTo(thisPoint @ 500);
-						Pen.stroke;
+					scaledPoints.do({arg thisPoint, i;
+						if(drawPointsArr[i], {
+							Pen.moveTo(thisPoint @ 0);
+							Pen.lineTo(thisPoint @ (view.bounds.height));
+							Pen.stroke;
+						});
 					});
 					Pen.fillColor_(skin.cueLabel);
-					points.do({arg thisPoint, i;
-						Pen.stringAtPoint(cues[i][0].asString,
-							(thisPoint + 3) @ (100 + ((i % 10) * 40)));
-						Pen.fillStroke;
-					})
+					scaledPoints.do({arg thisPoint, i;
+						if(drawPointsArr[i], {
+							Pen.stringAtPoint(cues[i][0].asString,
+								(thisPoint + 3) @ (10 + ((i % 10) * 40)));
+							Pen.fillStroke;
+						});
+					});
 				});
 				menuItems = cues.collect({arg thisCue;
 					var key, time, nTabs;
@@ -632,7 +675,7 @@ SFPlayer {
 				});
 				// cueMenu.items_(["None" + "\t\t\t" + 0.asTimeString] ++ menuItems);
 				cueMenu.items_(["None" + "\t" + 0.asTimeString] ++ menuItems);
-				window.refresh;
+				cuesView.refresh;
 			})
 		})
 	}
@@ -686,7 +729,7 @@ SFPlayer {
 				\amp, {
 					hasGUI.if({
 						if(args[1] != \number, {
-						ampNumber.value_(value.ampdb.round(0.1));
+							ampNumber.value_(value.ampdb.round(0.1));
 						}, {"not updating number".postln;});
 						if(args[1] != \slider, {
 							ampSlider.value_(ampSpec.unmap(value.ampdb));
