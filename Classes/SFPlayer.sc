@@ -163,7 +163,7 @@ SFPlayer {
 				this.changed(\isPlaying, this.isPlaying);
 				// hasGUI.if({
 				// this.playGUIRoutine
-			// })
+				// })
 			})
 		})
 	}
@@ -256,42 +256,27 @@ SFPlayer {
 			window.view.layout_(
 				VLayout(
 					HLayout(
-						timeString = StaticText(window)
-						.font_(Font("Arial", 72))
-						.stringColor_(skin.string)
-						.string_(startTime.asTimeString[3..10])
-						.fixedWidth_(300),
-						VLayout(
-							// Play / Pause button
-							playButton = Button.new(window)
-							.states_([
-								[">", skin.string, skin.background],
-								["||", skin.string, skin.background]])
-							.focus(true)
-							.action_({arg button;
-								[{this.pause}, {this.play}][button.value].value;
-							})
-							.minWidth_(120),
-							Button.new(window, Rect(310, 40, 120, 20))
-							.states_([
-								["[]", skin.string, skin.background]])
-							.canFocus_(false)
-							.action_({this.stop}),
-							Button.new(window, Rect(310, 70, 120, 20))
-							.states_([
-								["Scope On", skin.string, skin.background],
-								["Scope Off", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({arg button;
+						GridLayout.rows(
+							[
 								[
-									{scope.window.close},
-									{scope = server.scope(sf.numChannels, outbus)}
-								][button.value].value;
-							})
-						).margins_([10, 0, 0, 10]),
-						VLayout(
-							HLayout(
+									timeString = StaticText(window)
+									.font_(Font("Arial", 72))
+									.stringColor_(skin.string)
+									.string_(startTime.asTimeString[3..10])
+									.fixedWidth_(300),
+									rows: 3
+								],
+
+								playButton = Button.new(window)
+								.states_([
+									[">", skin.string, skin.background],
+									["||", skin.string, skin.background]])
+								.focus(true)
+								.action_({arg button;
+									[{this.pause}, {this.play}][button.value].value;
+								})
+								.minWidth_(120),
+
 								StaticText(window)
 								.string_("Outbus")
 								.stringColor_(skin.string),
@@ -300,34 +285,13 @@ SFPlayer {
 								.value_(outbus ?? {0})
 								.action_({arg menu; this.outbus_(menu.value, false); playButton.focus(true)})
 								.stringColor_( skin.string )
-							),
-							HLayout(
-								StaticText(window)
-								.string_("addAction")
-								.stringColor_(skin.string),
-								addActionMenu = PopUpMenu(window)
-								.items_(this.getAddActionsArray)
-								.value_(this.getAddActionIndex(this.addAction))
-								.action_({arg menu; this.addAction_(menu.value); playButton.focus(true)})
-								.stringColor_( skin.string )
-							),
-							HLayout(
-								StaticText(window)
-								.string_("Target")
-								.stringColor_(skin.string),
-								targetText = TextField(window)
-								.value_(this.target.asString)
-								.action_({arg menu; this.target_(menu.value.interpret); playButton.focus(true)})
-								.stringColor_( skin.string )
-								.maxWidth_(80)
-							),
-							nil,
-						).margins_([10, 0, 0, 10]), //outbus
-						VLayout(
-							HLayout(
+								.background_(skin.background)
+								.maxWidth_(120),
+
 								StaticText(window)
 								.string_("Amplitude (in db)")
 								.stringColor_( skin.string),
+								nil,
 								ampNumber = NumberBox(window)
 								.value_(amp.ampdb)
 								.action_({arg me;
@@ -336,29 +300,83 @@ SFPlayer {
 									// playButton.focus(true));
 									playButton.focus(true);
 								}).maxWidth_(60),
+
+								nil,
+							], [
+								nil,
+
+								Button.new(window, Rect(310, 40, 120, 20))
+								.states_([
+									["[]", skin.string, skin.background]])
+								.canFocus_(false)
+								.action_({this.stop}),
+
+								StaticText(window)
+								.string_("addAction")
+								.stringColor_(skin.string),
+								addActionMenu = PopUpMenu(window)
+								.items_(this.getAddActionsArray)
+								.value_(this.getAddActionIndex(this.addAction))
+								.action_({arg menu; this.addAction_(menu.value); playButton.focus(true)})
+								.stringColor_( skin.string )
+								.background_(skin.background)
+								.maxWidth_(120)
+								,
+
+								[
+									ampSlider = Slider(window)
+									.value_(ampSpec.unmap(amp))
+									.canFocus_(false)
+									.orientation_(\horizontal)
+									.action_({arg me;
+										this.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
+										// ampNumber.value_(ampSpec.map(me.value).round(0.1))
+									}),
+									columns: 3
+								],
 								nil
-							),
-							ampSlider = Slider(window)
-							.value_(ampSpec.unmap(amp))
-							.canFocus_(false)
-							.orientation_(\horizontal)
-							.action_({arg me;
-								this.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
-								// ampNumber.value_(ampSpec.map(me.value).round(0.1))
-							})
-							.fixedSize_(240@24),
-							HLayout(
+							], [
+								nil,
+
+								Button.new(window, Rect(310, 70, 120, 20))
+								.states_([
+									["Scope On", skin.string, skin.background],
+									["Scope Off", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({arg button;
+									[
+										{scope.window.close},
+										{scope = server.scope(sf.numChannels, outbus)}
+									][button.value].value;
+								}),
+
+								StaticText(window)
+								.string_("Target")
+								.stringColor_(skin.string),
+								targetText = TextField(window)
+								.value_(this.target.asString)
+								.action_({arg menu; this.target_(menu.value.interpret); playButton.focus(true)})
+								.stringColor_( skin.string )
+								.background_(skin.background)
+								.maxWidth_(120),
+
 								Button.new(window)
 								.states_([
 									["Reset", skin.string, skin.background]
 								])
 								.canFocus_(false)
 								.action_({this.reset}),
-								nil
-							)
-						).margins_([10, 0, 0, 10]), //amp etc
-						[nil, stretch: 2], //empty space on the right
-					), //end of top section with time, play/stop, amp etc
+
+								nil,
+								nil,
+								nil,
+								nil,
+							]
+
+						),
+						nil
+					).margins_([0, 0, 0, 0]), //end of top section with time, play/stop, amp etc
 					[
 						VLayout(
 							[
@@ -414,7 +432,9 @@ SFPlayer {
 									cueMenu = PopUpMenu(window)
 									.items_(cues.asArray)
 									.stringColor_(skin.string)
+									.background_(skin.background)
 									.canFocus_(false)
+									.allowsReselection_(true)
 									.mouseUpAction_({"MouseUp".postln;})
 									.mouseDownAction_({arg view;
 										isPlaying.if({wasPlaying = true;this.stop});
@@ -666,15 +686,15 @@ SFPlayer {
 					var key, time, nTabs;
 					(thisCue[0].asString.size > 6).if({
 						// nTabs = "\t\t"
-						nTabs = "\t"
+						nTabs = "  "  //fix for tabs in popupmenu
 					}, {
 						// nTabs = "\t\t\t"
-						nTabs = "\t"
+						nTabs = "      "  //fix for tabs in popupmenu
 					});
 					thisCue[0].asString + nTabs + thisCue[1].asTimeString;
 				});
 				// cueMenu.items_(["None" + "\t\t\t" + 0.asTimeString] ++ menuItems);
-				cueMenu.items_(["None" + "\t" + 0.asTimeString] ++ menuItems);
+				cueMenu.items_(["None" + "      " + 0.asTimeString] ++ menuItems); //fix for tabs in popupmenu
 				cuesView.refresh;
 			})
 		})
