@@ -269,9 +269,10 @@ SFPlayer {
 
 								playButton = Button.new(window)
 								.states_([
-									[">", skin.string, skin.background],
-									["||", skin.string, skin.background]])
+									["►", skin.string, skin.background],
+									["❙❙", skin.string, skin.background]])
 								.focus(true)
+								.fixedHeight_(32)
 								.action_({arg button;
 									[{this.pause}, {this.play}][button.value].value;
 								})
@@ -307,7 +308,7 @@ SFPlayer {
 
 								Button.new(window, Rect(310, 40, 120, 20))
 								.states_([
-									["[]", skin.string, skin.background]])
+									["◼", skin.string, skin.background]])
 								.canFocus_(false)
 								.action_({this.stop}),
 
@@ -374,7 +375,7 @@ SFPlayer {
 								nil,
 							]
 
-						),
+						).hSpacing_(16),
 						nil
 					).margins_([0, 0, 0, 0]), //end of top section with time, play/stop, amp etc
 					[
