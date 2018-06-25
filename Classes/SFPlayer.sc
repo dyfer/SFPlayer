@@ -394,6 +394,7 @@ SFPlayer {
 									.timeCursorOn_(true)
 									.background_(skin.sfBackground)
 									.waveColors_(Array.fill(sf.numChannels, skin.sfWaveform))
+									.rmsColor_(Color.gray(1, 0.2))
 									.mouseDownAction_({this.pausePlay})
 									.mouseUpAction_({this.playPaused})
 									.mouseMoveAction_({arg view;
