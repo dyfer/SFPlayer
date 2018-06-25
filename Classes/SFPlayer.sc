@@ -387,9 +387,7 @@ SFPlayer {
 									.canFocus_(false)
 									.soundfile_(sf)
 									.timeCursorColor_(skin.sfCursor)
-									.readWithTask(0, sf.numFrames
-										, block: 64,
-										doneAction: {window.front; doneAction.value})
+									.readWithTask(0, sf.numFrames, doneAction: {window.front; doneAction.value})
 									.gridOn_(false)
 									.timeCursorOn_(true)
 									.background_(skin.sfBackground)
