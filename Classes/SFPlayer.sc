@@ -2,7 +2,7 @@ SFPlayer {
 	var <path, <outbus, <server, <>autoSetSampleRate, <>autoSetOutputChannels;
 	var <bufnum, <sf, cond, curNode, curTime, <curSynth, <synthName;
 	var <window, bounds, outMenu, playButton, ampSlider, ampNumber, targetText, addActionMenu;
-	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, <cuesView, <gridView, <timeGrid, guiRoutine;
+	var <amp, <isPlaying = false, wasPlaying, hasGUI, <startTime, timeString, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
 	var scope, iEnv, clock;
 	var <cues, offset, cueMenu, lastStart, cueOffsetNum, <skin;
 	var <openFilePending = false, <openGUIafterLoading = false, tempBounds, tempAction, <>duplicateSingleChannel = true;
@@ -232,6 +232,7 @@ SFPlayer {
 	}
 
 	gui {arg argBounds, doneAction;
+		var scrollAction;
 		if(openFilePending, {
 			tempBounds = argBounds;
 			tempAction = doneAction;
@@ -252,6 +253,18 @@ SFPlayer {
 			timeGrid.font_(Font("Arial", 10));
 			timeGrid.gridColors_([skin.string, nil]);
 			window.onClose_({isPlaying.if({this.stop}); hasGUI = false; this.removeDependant(this)});
+			scrollAction = {arg view; //called by soundfileview, as well as range slider
+				var scrollRatio = view.viewFrames/ sf.numFrames;
+				var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * sf.duration;
+				var end = start + (scrollRatio * sf.duration);
+				var grid = timeGrid.x.grid;
+				var rangeSize, rangeStart;
+				grid.spec.minval_(start);
+				grid.spec.maxval_(end);
+				timeGrid.horzGrid_(grid);
+				gridView.refresh;
+				cuesView.refresh;
+			};
 			hasGUI = true;
 			window.view.layout_(
 				VLayout(
@@ -380,6 +393,24 @@ SFPlayer {
 					).margins_([0, 0, 0, 0]), //end of top section with time, play/stop, amp etc
 					[
 						VLayout(
+							zoomSlider = RangeSlider(window).orientation_(\horizontal)
+							.lo_(0).range_(1)
+							.background_(skin.background)
+							.knobColor_(Color.black)
+							.canFocus_(false)
+							.action_({arg view;
+								var divisor, rangeStart;
+								rangeStart = view.lo;
+								divisor = 1 - view.range;
+								if(divisor < 0.0001) {
+									rangeStart = 0;
+									divisor = 1;
+
+								};
+								sfView.xZoom_(view.range * sf.duration)
+								.scrollTo(rangeStart / divisor);
+								scrollAction.(sfView);
+							}),
 							[
 								StackLayout(
 									cuesView = UserView(window).acceptsMouse_(false),
@@ -396,27 +427,25 @@ SFPlayer {
 									.mouseDownAction_({this.pausePlay})
 									.mouseUpAction_({this.playPaused})
 									.mouseMoveAction_({arg view;
-										var scrollRatio = view.viewFrames/ sf.numFrames;
-										var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * sf.duration;
-										var end = start + (scrollRatio * sf.duration);
-										var grid = timeGrid.x.grid;
-										grid.spec.minval_(start);
-										grid.spec.maxval_(end);
-										timeGrid.horzGrid_(grid);
-										gridView.refresh;
-										cuesView.refresh;
+										var rangeSize, rangeStart;
+										//for zoom slider
+										rangeSize = view.xZoom / sf.duration;
+										rangeStart = view.scrollPos * (1 - rangeSize);
+										zoomSlider.lo_(rangeStart).range_(rangeSize);
+										//
+										scrollAction.(view);
 									})
 									.timeCursorPosition_(0 / sf.duration),
 								).mode_(\stackAll),
 								stretch: 10
 							],
 							gridView = UserView()
-							.drawFunc_({|view|
+							.drawFunc_({arg view;
 								timeGrid.bounds = Rect(0, 0, view.bounds.width, view.bounds.height);
 								timeGrid.draw;
 							})
-							.minHeight_(12)
-						).margins_([0, 0, 0, 0]).spacing_(0),
+							.minHeight_(12),
+						).margins_([0, 0, 0, 0]).spacing_(1),
 						stretch: 10
 					],
 
