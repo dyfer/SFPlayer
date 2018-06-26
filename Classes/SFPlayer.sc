@@ -258,7 +258,6 @@ SFPlayer {
 				var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * sf.duration;
 				var end = start + (scrollRatio * sf.duration);
 				var grid = timeGrid.x.grid;
-				var rangeSize, rangeStart;
 				grid.spec.minval_(start);
 				grid.spec.maxval_(end);
 				timeGrid.horzGrid_(grid);
@@ -368,12 +367,16 @@ SFPlayer {
 								StaticText(window)
 								.string_("Target")
 								.stringColor_(skin.string),
-								targetText = TextField(window)
-								.value_(this.target.asString)
-								.action_({arg menu; this.target_(menu.value.interpret); playButton.focus(true)})
-								.stringColor_( skin.string )
-								.background_(skin.background)
-								.maxWidth_(120),
+								{
+									var previousString = "";
+									targetText = TextField(window)
+									.value_(this.target.asString)
+									.action_({arg view; this.target_(view.value.interpret); playButton.focus(true); previousString = view.value;})
+									.stringColor_( skin.string )
+									.background_(skin.background)
+									.focusLostAction_({|view| if(previousString != view.string, {view.doAction})}) //execute when lost focus only if the string changed
+									.maxWidth_(120)
+								}.(),
 
 								Button.new(window)
 								.states_([
