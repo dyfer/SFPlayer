@@ -456,7 +456,8 @@ SFPlayer {
 							[
 								StaticText(window)
 								.string_("Play From Cue:")
-								.stringColor_( skin.string),
+								.stringColor_( skin.string)
+								.minWidth_(100),
 								[
 									cueMenu = PopUpMenu(window)
 									.items_(cues.asArray)
@@ -499,12 +500,17 @@ SFPlayer {
 									this.saveCues
 								}),
 								StaticText(window)
-								.string_("Add cues ([\\key, val])")
-								.stringColor_(skin.string),
+								.string_("Add cues [\\key, time] or \\key") // time can be a number in seconds or string "(hh:)mm:ss.xxx"; if \key alone is provided, current cursor time is used
+								.stringColor_(skin.string)
+								.minWidth_(180),
 								TextField(window)
 								.action_({arg me;
 									var vals;
 									vals = me.string.interpret;
+									vals.isKindOf(Symbol).if({
+										vals = [vals, this.startTime]
+									}); //take time from the cursor
+									vals = vals.collect({arg val, inc; val.isKindOf(String).if({val.asSecs}, {val})}); //convert time string to seconds
 									vals.isKindOf(Array).if({
 										vals = vals.flat.clump(2);
 									}, {
@@ -520,6 +526,7 @@ SFPlayer {
 									});
 									playButton.focus(true);
 								}),
+
 								// [nil, rows: 2, stretch: 1]
 							], [
 								StaticText(window)
