@@ -293,8 +293,10 @@ SFPlayer {
 
 	loadCues {arg path;
 		path.isNil.if({
-			Dialog.getPaths({arg paths;
-				cues = paths[0].load;
+			// Dialog.getPaths({arg paths;
+			Dialog.openPanel({arg thisPath;
+				// cues = paths[0].load;
+				cues = thisPath.load;
 				// this.drawCues;
 				this.changed(\cues, cues);
 			})
