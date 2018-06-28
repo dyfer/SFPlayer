@@ -3,7 +3,7 @@ SFPlayer {
 	var <bufnum, <sf, cond, curNode, <curSynth, <synthName;
 	var clock, <skin;
 	var <cues, offset, lastStart;
-	var <amp, <isPlaying = false, wasPlaying, <startTime, lastTimeForCurrentRate = 0;
+	var <amp, <isPlaying = false, <isPaused = false, <bufferPreloaded = false, <isStopping = false, <isStarting = false, wasPlaying, <startTime, lastTimeForCurrentRate = 0;
 	var <openFilePending = false, <openGUIafterLoading = false, <>duplicateSingleChannel = true;
 	var rateVar, addActionVar, targetVar, bufsizeVar;
 	var <>switchTargetWhilePlaying = true;
@@ -86,6 +86,7 @@ SFPlayer {
 	}
 
 	loadBuffer {arg bufsize = 65536, startTime = 0;
+		"loading buffer".postln;
 		bufsize = bufsize * sf.numChannels;
 		server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
 			[\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
@@ -127,59 +128,92 @@ SFPlayer {
 	}
 
 	play {arg bufsize, addAction, target, rate;
-		// format("startTime in play: %", startTime).postln;
+		format("startTime in play: %", startTime).postln;
 		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil).if({
 			bufsize !? {bufsizeVar = bufsize};
 			addAction !? {addActionVar = addAction};
 			target !? {targetVar = target};
 			rate !? {rateVar = rate};
 			isPlaying = true; //moved here so we have this status synchronously...
-			Routine.run({
-				clock = TempoClock(this.rate, startTime);
-				lastStart = startTime;
-				// clock.sched(sf.duration - startTime + 0.1, {this.stop});
-				this.loadBuffer(bufsizeVar, startTime);
-				server.sync(cond);
-				if(isPlaying.not, { //if we were stopped in the meantime, call .stop to free resources and don't start playing;
-					this.stop;
-				}, {
-					clock.schedAbs(sf.duration + (attRelTime * 2), {this.stop});
-					// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
-					// curNode = server.nodeAllocator.alloc(1), addAction, target,
-					// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
-					curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
-					curNode = curSynth.nodeID;
-					this.changed(\isPlaying, this.isPlaying);
-				});
-			})
+			"isStarting: ".post;isStarting.postln;
+			isStarting.not.if({ //prevent starting if we're already in the play routine
+				isStarting = true;
+				Routine.run({
+					lastStart = startTime;
+					// clock.sched(sf.duration - startTime + 0.1, {this.stop});
+					if(bufferPreloaded.not && isPlaying, {
+						this.loadBuffer(bufsizeVar, startTime);
+						// bufferPreloaded = false;//not sure if needed here
+					}, {
+						"buffer preloaded already or playback aborted".postln;
+					});
+					server.sync; //(cond);
+					if(isPlaying.not, { //if we were stopped in the meantime, call .stop to free resources and don't start playing;
+						"aborting playback".postln;
+						isStarting = false;
+						this.stop;
+					}, {
+						"starting synth".postln;
+						clock = TempoClock(this.rate, startTime);
+						clock.schedAbs(sf.duration + (0.2), {this.stop}); //should I move this to nodewatcher?
+						// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
+						// curNode = server.nodeAllocator.alloc(1), addAction, target,
+						// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
+						curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
+						curNode = curSynth.nodeID;
+						isPaused = false;
+						isStarting = false;
+						this.changed(\isPlaying, this.isPlaying);
+						this.changed(\isPaused, isPaused);
+					});
+				})
+			}, {
+				"routine seems running, aborting start".postln;
+			});
 		})
 	}
 
 	pause {
 		isPlaying.if({
 			var now = this.curTime;
+			"pause playing".postln;
 			this.stop(false);
 			this.startTime_(now);
 		}, {
-			//implement stopped pause (preaload buffer) here
+			if(isPaused.not, {
+				"pause stopped".postln;
+				this.loadBuffer(bufsizeVar, startTime);
+				"preloading buffer".postln;
+				bufferPreloaded = true;
+			});
 		});
+		isPaused = true;
+		this.changed(\isPaused, isPaused);
 	}
 
 	stop {arg updateStart = true; //I think this should be false by default?
 		var oldbufnum;
-		isPlaying.if({
-			// "stopping".postln;
+		(isPlaying || isPaused).if({
+			"stopping".postln;
+			// isStopping = true;
 			clock.stop;
-			curSynth !? {curSynth.release};
+			curSynth !? {curSynth.release; curSynth = nil};
 			oldbufnum = bufnum;
 			isPlaying = false;
+			isPaused = false;
+			bufferPreloaded = false;
 			this.changed(\isPlaying, isPlaying, updateStart);
+			this.changed(\isPaused, isPaused);
 			SystemClock.sched(0.2, {
 				server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
-				server.bufferAllocator.free(oldbufnum)
+				server.bufferAllocator.free(oldbufnum);
+				"buffer freed".postln;
+				// isStopping = false;
 			});
-			updateStart.if({{this.startTime_(lastStart)}.defer(0.1)});
-		})
+			updateStart.if({{this.startTime_(lastStart)}.defer(0.1)}); //this can probably be substituted with this.changed?
+		}, {
+			this.changed(\startTime, startTime);// just update dependents if not playing
+		});
 	}
 
 	outbus_ {arg newOut, updateMenu = true;
@@ -203,15 +237,16 @@ SFPlayer {
 	curTime {
 		var time;
 		if(isPlaying, {
-			time = clock.beats;
-		}, {
-			time = startTime;
-		})
+			try {
+				time = clock.beats;
+			}
+		});
+		time = time ?? startTime; //if getting from the clock failed, revert to startTime
 		^time;
 	}
 
 	startTime_ {arg newStartTime;
-		startTime = (newStartTime + offset).max(0).min(sf.duration);
+		newStartTime !? {startTime = (newStartTime + offset).max(0).min(sf.duration)};
 		// format("new startTime: %", startTime).postln;
 		this.changed(\startTime, startTime);
 		if(isPlaying, { //jump to that position
@@ -354,6 +389,7 @@ SFPlayer {
 		isPlaying.if({this.stop});
 		{
 			// cueMenu.value_(0); //fixme move to update
+			isStarting = false;
 			this.startTime_(0);
 			this.amp_(1);
 		}.defer(0.11) //fixme: do we need defer here?
