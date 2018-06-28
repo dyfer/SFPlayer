@@ -123,7 +123,7 @@ SFPlayer {
 	rate_ {arg val;
 		rateVar = val;
 		clock !? {clock.tempo = rateVar};
-		curSynth.set(\rate, rateVar);
+		curSynth.set(\rate, this.rate);
 		this.changed(\rate, this.rate);
 	}
 
