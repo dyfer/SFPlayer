@@ -8,6 +8,7 @@ SFPlayer {
 	var rateVar, addActionVar, targetVar, bufsizeVar;
 	var <>switchTargetWhilePlaying = true;
 	var <guiObject;
+	var <attRelTime = 0.02;
 
 	*new {arg path, outbus, server, skin, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
 		^super.newCopyArgs(path, outbus, server, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
@@ -79,7 +80,7 @@ SFPlayer {
 				diskin = diskin.dup
 			});
 			Out.ar(outbus, diskin *
-				EnvGen.kr(Env([0, 1, 0], [0.02, 0.02], \sin, 1), gate, doneAction: 2) *
+				EnvGen.kr(Env([0, 1, 0], [attRelTime, attRelTime], \sin, 1), gate, doneAction: 2) *
 				Lag.kr(amp, 0.1))
 		}).add;
 	}
@@ -136,12 +137,13 @@ SFPlayer {
 			Routine.run({
 				clock = TempoClock(this.rate, startTime);
 				lastStart = startTime;
-				clock.sched(sf.duration - startTime + 0.1, {this.stop}); //move this to node watcher...
+				// clock.sched(sf.duration - startTime + 0.1, {this.stop});
 				this.loadBuffer(bufsizeVar, startTime);
 				server.sync(cond);
 				if(isPlaying.not, { //if we were stopped in the meantime, call .stop to free resources and don't start playing;
 					this.stop;
 				}, {
+					clock.schedAbs(sf.duration + (attRelTime * 2), {this.stop});
 					// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
 					// curNode = server.nodeAllocator.alloc(1), addAction, target,
 					// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
@@ -158,7 +160,9 @@ SFPlayer {
 			var now = this.curTime;
 			this.stop(false);
 			this.startTime_(now);
-		})
+		}, {
+			//implement stopped pause (preaload buffer) here
+		});
 	}
 
 	stop {arg updateStart = true; //I think this should be false by default?
