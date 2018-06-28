@@ -9,6 +9,7 @@ SFPlayer {
 	var <>switchTargetWhilePlaying = true;
 	var <guiObject;
 	var <attRelTime = 0.02;
+	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
 
 	*new {arg path, outbus, server, skin, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
 		^super.newCopyArgs(path, outbus, server, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
@@ -208,10 +209,10 @@ SFPlayer {
 				this.loadBuffer(startTime);
 				"preloading buffer".postln;
 				bufferPreloaded = true;
+				isPaused = true;
+				this.changed(\isPaused, isPaused);
 			});
 		});
-		isPaused = true;
-		this.changed(\isPaused, isPaused);
 	}
 
 	stop {arg updateStart = true; //I think this should be false by default?
@@ -425,46 +426,26 @@ SFPlayer {
 		// "update fired, what: ".post;
 		// what.post;
 		// ": ".post; args.postln;
-		// {
-		// 	what.switch(
-		// 		\addAction, {if(hasGUI, {addActionMenu.value_(this.getAddActionIndex(value))})},
-		// 		\target, {if(hasGUI, {targetText.value_(value.asNodeID.asString)})},
-		// 		\amp, {
-		// 			hasGUI.if({
-		// 				if(args[1] != \number, {
-		// 					ampNumber.value_(value.ampdb.round(0.1));
-		// 				}, {"not updating number".postln;});
-		// 				if(args[1] != \slider, {
-		// 					ampSlider.value_(ampSpec.unmap(value.ampdb));
-		// 				});
-		// 			})
-		// 		},
-		// 		\outbus, {
-		// 			var updMenu = args[1];
-		// 			(hasGUI && updMenu).if({
-		// 				outMenu.value_(value)
-		// 			})
-		// 		},
-		// 		\isPlaying, {
-		// 			if(hasGUI, {
-		// 				if(value, {
-		// 					this.playGUIRoutine;
-		// 					}, {
-		// 						this.stopGUIRoutine;
-		// 						playButton.value_(0);
-		// 				})
-		// 			})
-		// 		},
-		// 		\startTime, {
-		// 			hasGUI.if({
-		// 				sfView.timeCursorPosition_((startTime * sf.sampleRate).round);
-		// 				timeString.string_(startTime.asTimeString[3..10]);
-		// 				cueOffsetNum.value_(0);
-		// 				offset = 0;
-		// 			})
-		// 		}
-		// 	)
-		// }.defer;
+		if(who != this, {
+			what.switch(
+				\addAction, {if(followAddAction, {this.addAction_(value)})},
+				\target, {if(followTarget, {this.target_(value)})},
+				\amp, {if(followAmp, {this.amp_(value)})},
+				\outbus, {if(followOutbus, {this.outbus_(value)})},
+				\rate, {if(followRate, {this.rate_(value)})},
+				\isPlaying, {
+					if(followPlayStopPause, {
+						if(value, {
+							this.play;
+						}, {
+							this.stop(args[1]);//updateStart
+						})
+					})
+				},
+				\isPaused, {if(followPlayStopPause && value, {this.pause})},
+				\startTime, {if(followStartTime, {this.startTime_(value)})}
+			)
+		})
 	}
 
 }
@@ -582,11 +563,20 @@ SFPlayerView {
 							StaticText()
 							.string_("Outbus")
 							.stringColor_(skin.string),
-							outMenu = PopUpMenu()
-							.items_(player.server.options.numAudioBusChannels.collect({arg i; i.asString})) //fixme this might need updating after boot!
+							// outMenu = PopUpMenu()
+							// .items_(player.server.options.numAudioBusChannels.collect({arg i; i.asString})) //fixme this might need updating after boot!
+							outMenu = NumberBox()
 							.value_(player.outbus ?? {0})
-							.action_({arg menu; player.outbus_(menu.value, false); playButton.focus(true)})
+							.action_({arg menu; player.outbus_(menu.value, false)})
+							.keyDownAction_({arg view, char, modifiers, unicode, keycode, key;
+								// char.postln; unicode.postln;
+								if((unicode == 3) || (unicode == 13), {playButton.focus(true)}); //focus on play only after Enter/Return
+							})
 							.stringColor_( skin.string )
+							.normalColor_( skin.string )
+							.clipLo_(0)
+							.clipHi_(player.server.options.numAudioBusChannels) //this might need to be updated after boot?
+							.step_(1)
 							.background_(skin.background)
 							.maxWidth_(120),
 

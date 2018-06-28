@@ -7,12 +7,15 @@ related:: Classes/VDiskIn, Classes/SoundFileView
 DESCRIPTION::
 SFPlayer plays sound files directly from disk. It also has a convenient GUI.
 
+The most common use is:
+code::SFPlayer.new.gui:: or code::SFPlayer.new("/path/to/soundfile").gui::. See examples below.
+
 CLASSMETHODS::
 
 METHOD:: new
 
 ARGUMENT:: path
-The path (complete or relative) to a soundfile. If no path is specified specified, an Open Dialog will be shown to choose the file.
+The path to a soundfile. If no path is specified specified, an Open Dialog will be shown to choose the file.
 
 ARGUMENT:: outbus
 The bus to output to
@@ -21,13 +24,14 @@ ARGUMENT:: server
 The server to use
 
 ARGUMENT:: skin
+Optionally an instance of code::SFPlayerSkin::, controlling the color scheme of the GUI when shown.
 
 
 INSTANCEMETHODS::
 
 
 METHOD:: gui
-Show a GUI of the SFPlayer
+Show a GUI of the code::SFPlayer::. This creates an instance of code::SFPlayerView:: (but the method returns the original code::SFPlayer::).
 
 ARGUMENT:: argBounds
 Bounds
@@ -37,110 +41,32 @@ Action to be performed after opening the window
 
 returns:: this SFPlayer
 
-
-METHOD:: drawCues
-
-METHOD:: skin
-
-METHOD:: stopGUIRoutine
-
-METHOD:: offset
-
-ARGUMENT:: newOffset
-
-METHOD:: cues
-
-METHOD:: sf
-
-METHOD:: startTime
-
-ARGUMENT:: newStartTime
-
-METHOD:: loadBuffer
-
-ARGUMENT:: bufsize
-
-ARGUMENT:: startTime
+METHOD:: play
+Play the file from the current position;
 
 METHOD:: stop
+Stop playing. code::startTime:: is left at the original value;
 
 ARGUMENT:: updateStart
-
-METHOD:: path
+If code::true::, the cursor in the GUI and other dependants will be reset to the previous start postion.
 
 METHOD:: pause
-
-METHOD:: playGUIRoutine
-
-METHOD:: addCue
-
-ARGUMENT:: key
-
-ARGUMENT:: time
-
-ARGUMENT:: sort
-
-ARGUMENT:: redraw
-
-METHOD:: saveCues
-
-ARGUMENT:: path
-
-METHOD:: amp
-
-ARGUMENT:: newAmp
-
-METHOD:: pausePlay
-
-METHOD:: runSetup
-
-METHOD:: playFromCue
-
-ARGUMENT:: key
-
-ARGUMENT:: idx
-
-METHOD:: loadCues
-
-ARGUMENT:: path
+Stop playing. code::startTime:: is updated to the current playback position.
+note::If code::pause:: is called when the player is stopped, it will preload the playback buffer and wait for the start of playback. This allows starting playback without additional delay for large files or when multiple players are synchronized together::
 
 METHOD:: reset
+Updates the player to the initial state (resets playback position, amp, etc.)
 
-METHOD:: play
+subsection:: Synchronizing multiple players
 
-ARGUMENT:: bufsize
-
-ARGUMENT:: addAction
-
-ARGUMENT:: target
-
-METHOD:: sortCues
-
-METHOD:: hideCues
-
-METHOD:: initSFPlayer
-
-ARGUMENT:: argSkin
-
-METHOD:: outbus
-
-ARGUMENT:: newOut
-
-ARGUMENT:: updateMenu
-
-METHOD:: removeCue
-
-ARGUMENT:: key
-
-ARGUMENT:: sort
-
-ARGUMENT:: redraw
-
-METHOD:: window
-
-METHOD:: buildSD
-
-METHOD:: playPaused
+It is possible to link multiple players together and have them start playback at the same time.
+code::
+(
+p = SFPlayer.new(Platform.resourceDir +/+ "sounds/a11wlk01.wav").gui;
+q = SFPlayer.new(Platform.resourceDir +/+ "sounds/a11wlk01-44_1.aiff").gui;
+p.addDependant(q); //p is "master", q is "slave"
+)
+::
 
 EXAMPLES::
 
