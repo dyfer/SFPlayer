@@ -1,11 +1,11 @@
 SFPlayer {
 	var <path, <outbus, <server, <>autoSetSampleRate, <>autoSetOutputChannels;
-	var <bufnum, <sf, cond, curNode, <curSynth, <synthName;
+	var <buffer, <sf, cond, <curSynth, <synthName;
 	var clock, <skin;
 	var <cues, offset, lastStart;
 	var <amp, <isPlaying = false, <isPaused = false, <bufferPreloaded = false, <isStopping = false, <isStarting = false, wasPlaying, <startTime, lastTimeForCurrentRate = 0;
 	var <openFilePending = false, <openGUIafterLoading = false, <>duplicateSingleChannel = true;
-	var rateVar, addActionVar, targetVar, bufsizeVar;
+	var rateVar, addActionVar, targetVar, bufsizeVar, <>multiplyBufsizeByNumChannels = true;
 	var <>switchTargetWhilePlaying = true;
 	var <guiObject;
 	var <attRelTime = 0.02;
@@ -85,11 +85,34 @@ SFPlayer {
 		}).add;
 	}
 
-	loadBuffer {arg bufsize = 65536, startTime = 0;
+	loadBuffer {arg sTime = 0, completionMessage;
+		var localBufSize;
 		"loading buffer".postln;
-		bufsize = bufsize * sf.numChannels;
-		server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
-			[\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
+		if(multiplyBufsizeByNumChannels, {
+			localBufSize = this.bufsize * sf.numChannels;
+		}, {
+			localBufSize = this.bufSize;
+		});
+		// bufsize = bufsize * sf.numChannels; //should I multiplet
+		// server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
+			// [\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
+		buffer = Buffer.cueSoundFile(server, path, sTime * sf.sampleRate, sf.numChannels, localBufSize, completionMessage);
+	}
+
+	freeBuffer {arg when;
+		var oldBuf;
+		when.notNil.if({
+			oldBuf = buffer;
+			{
+				try{oldBuf.close};
+				oldBuf.free;
+				"buffer freed (scheduled)".postln;
+			}.defer(when);
+		}, {
+			try{buffer.close};
+			buffer.free;
+			"buffer freed right away".postln;
+		});
 	}
 
 	bufsize {^bufsizeVar}
@@ -142,7 +165,7 @@ SFPlayer {
 					lastStart = startTime;
 					// clock.sched(sf.duration - startTime + 0.1, {this.stop});
 					if(bufferPreloaded.not && isPlaying, {
-						this.loadBuffer(bufsizeVar, startTime);
+						this.loadBuffer(startTime);
 						// bufferPreloaded = false;//not sure if needed here
 					}, {
 						"buffer preloaded already or playback aborted".postln;
@@ -159,8 +182,8 @@ SFPlayer {
 						// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
 						// curNode = server.nodeAllocator.alloc(1), addAction, target,
 						// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
-						curSynth = Synth(synthName, [\buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
-						curNode = curSynth.nodeID;
+						curSynth = Synth(synthName, [\buffer, buffer, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
+						// curNode = curSynth.nodeID;
 						isPaused = false;
 						isStarting = false;
 						this.changed(\isPlaying, this.isPlaying);
@@ -182,7 +205,7 @@ SFPlayer {
 		}, {
 			if(isPaused.not, {
 				"pause stopped".postln;
-				this.loadBuffer(bufsizeVar, startTime);
+				this.loadBuffer(startTime);
 				"preloading buffer".postln;
 				bufferPreloaded = true;
 			});
@@ -192,24 +215,25 @@ SFPlayer {
 	}
 
 	stop {arg updateStart = true; //I think this should be false by default?
-		var oldbufnum;
+		// var oldbufnum;
 		(isPlaying || isPaused).if({
 			"stopping".postln;
 			// isStopping = true;
 			clock.stop;
 			curSynth !? {curSynth.release; curSynth = nil};
-			oldbufnum = bufnum;
+			// oldbufnum = bufnum;
 			isPlaying = false;
 			isPaused = false;
 			bufferPreloaded = false;
 			this.changed(\isPlaying, isPlaying, updateStart);
 			this.changed(\isPaused, isPaused);
-			SystemClock.sched(0.2, {
-				server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
-				server.bufferAllocator.free(oldbufnum);
-				"buffer freed".postln;
-				// isStopping = false;
-			});
+			this.freeBuffer(0.2);
+			// SystemClock.sched(0.2, {
+			// 	server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
+			// 	server.bufferAllocator.free(oldbufnum);
+			//
+			// 	// isStopping = false;
+			// });
 			updateStart.if({{this.startTime_(lastStart)}.defer(0.1)}); //this can probably be substituted with this.changed?
 		}, {
 			this.changed(\startTime, startTime);// just update dependents if not playing
