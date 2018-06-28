@@ -88,7 +88,7 @@ SFPlayer {
 
 	loadBuffer {arg sTime = 0, completionMessage;
 		var localBufSize;
-		"loading buffer".postln;
+		// "loading buffer".postln;
 		if(multiplyBufsizeByNumChannels, {
 			localBufSize = this.bufsize * sf.numChannels;
 		}, {
@@ -107,12 +107,12 @@ SFPlayer {
 			{
 				try{oldBuf.close};
 				oldBuf.free;
-				"buffer freed (scheduled)".postln;
+				// "buffer freed (scheduled)".postln;
 			}.defer(when);
 		}, {
 			try{buffer.close};
 			buffer.free;
-			"buffer freed right away".postln;
+			// "buffer freed right away".postln;
 		});
 	}
 
@@ -152,14 +152,14 @@ SFPlayer {
 	}
 
 	play {arg bufsize, addAction, target, rate;
-		format("startTime in play: %", startTime).postln;
+		// format("startTime in play: %", startTime).postln;
 		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil).if({
 			bufsize !? {bufsizeVar = bufsize};
 			addAction !? {addActionVar = addAction};
 			target !? {targetVar = target};
 			rate !? {rateVar = rate};
 			isPlaying = true; //moved here so we have this status synchronously...
-			"isStarting: ".post;isStarting.postln;
+			// "isStarting: ".post;isStarting.postln;
 			isStarting.not.if({ //prevent starting if we're already in the play routine
 				isStarting = true;
 				Routine.run({
@@ -169,15 +169,15 @@ SFPlayer {
 						this.loadBuffer(startTime);
 						// bufferPreloaded = false;//not sure if needed here
 					}, {
-						"buffer preloaded already or playback aborted".postln;
+						// "buffer preloaded already or playback aborted".postln;
 					});
 					server.sync; //(cond);
 					if(isPlaying.not, { //if we were stopped in the meantime, call .stop to free resources and don't start playing;
-						"aborting playback".postln;
+						// "aborting playback".postln;
 						isStarting = false;
 						this.stop;
 					}, {
-						"starting synth".postln;
+						// "starting synth".postln;
 						clock = TempoClock(this.rate, startTime);
 						clock.schedAbs(sf.duration + (0.2), {this.stop}); //should I move this to nodewatcher?
 						// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
@@ -192,7 +192,7 @@ SFPlayer {
 					});
 				})
 			}, {
-				"routine seems running, aborting start".postln;
+				// "routine seems running, aborting start".postln;
 			});
 		})
 	}
@@ -200,14 +200,14 @@ SFPlayer {
 	pause {
 		isPlaying.if({
 			var now = this.curTime;
-			"pause playing".postln;
+			// "pause playing".postln;
 			this.stop(false);
 			this.startTime_(now);
 		}, {
 			if(isPaused.not, {
-				"pause stopped".postln;
+				// "pause stopped".postln;
 				this.loadBuffer(startTime);
-				"preloading buffer".postln;
+				// "preloading buffer".postln;
 				bufferPreloaded = true;
 				isPaused = true;
 				this.changed(\isPaused, isPaused);
@@ -218,7 +218,7 @@ SFPlayer {
 	stop {arg updateStart = true; //I think this should be false by default?
 		// var oldbufnum;
 		(isPlaying || isPaused).if({
-			"stopping".postln;
+			// "stopping".postln;
 			// isStopping = true;
 			clock.stop;
 			curSynth !? {curSynth.release; curSynth = nil};
