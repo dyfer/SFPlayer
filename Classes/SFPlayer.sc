@@ -4,7 +4,8 @@ SFPlayer {
 	var clock, <skin;
 	var <cues, offset, lastStart;
 	var <amp, <isPlaying = false, <isPaused = false, <bufferPreloaded = false, <isStopping = false, <isStarting = false, wasPlaying, <startTime, lastTimeForCurrentRate = 0;
-	var <openFilePending = false, <openGUIafterLoading = false, <>duplicateSingleChannel = true;
+	// var <openFilePending = false, <openGUIafterLoading = false;
+	var <>duplicateSingleChannel = true;
 	var rateVar, addActionVar, targetVar, bufsizeVar, <>multiplyBufsizeByNumChannels = true;
 	var <>switchTargetWhilePlaying = true;
 	var <guiObject;
@@ -30,18 +31,17 @@ SFPlayer {
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
 		path.isNil.if({
-			openFilePending = true;
-			// Dialog.getPaths({arg paths;
-			Dialog.openPanel({arg paths;
-				// path = paths[0];
-				path = paths;
-				openFilePending = false;
-				this.runSetup;
-			})
+			this.loadFromOpenPanel;
 		}, {
-			openFilePending = false;
 			this.runSetup;
 		});
+	}
+
+	loadFromOpenPanel {
+		Dialog.openPanel({arg pathArg;
+			path = pathArg;
+			this.runSetup;
+		})
 	}
 
 	runSetup {
@@ -96,7 +96,7 @@ SFPlayer {
 		});
 		// bufsize = bufsize * sf.numChannels; //should I multiplet
 		// server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
-			// [\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
+		// [\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
 		buffer = Buffer.cueSoundFile(server, path, sTime * sf.sampleRate, sf.numChannels, localBufSize, completionMessage);
 	}
 
@@ -403,7 +403,7 @@ SFPlayer {
 		// this.play;
 	}
 
-	offset_ {arg newOffset; //what is offset for?
+	offset_ {arg newOffset; //time offset for playing from cue
 		var tmp;
 		tmp = startTime + offset;
 		offset = newOffset;
@@ -479,7 +479,7 @@ SFPlayerSkin {
 SFPlayerView {
 	var <player;
 	var <bounds, <parent, <doneAction, <skin, <>stopPlayerOnClose;
-	var <window, <view, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
+	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
 	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
@@ -582,123 +582,168 @@ SFPlayerView {
 		view.layout_(
 			VLayout(
 				HLayout(
+					HLayout(
+						nil,
+						timeString = StaticText()
+						.font_(Font("Arial", 72))
+						.stringColor_(skin.string)
+						.align_(\right)
+						.fixedHeight_(80)
+						// .string_(player.startTime.asTimeString[3..10])
+						// .string_(0.asTimeString[3..7])
+						// .minWidth_(200)
+						.fixedSize_(280@80)
+						,
+						VLayout(
+							24,
+							timeStringSm = StaticText()
+							.font_(Font("Arial", 36))
+							.stringColor_(skin.string)
+							.canFocus_(true)
+							// .string_(player.startTime.asTimeString[3..10])
+							// .string_("00")
+							// .fixedHeight_(44)
+							// .fixedWidth_(60)
+							.fixedSize_(60@40)
+							,
+						)
+					),
+					VLayout(
+						HLayout(
+							Button.new()
+							.states_([
+								["◼", skin.string, skin.background]])
+							.canFocus_(false)
+							.action_({player.stop})
+							.fixedWidth_(46)
+							.fixedHeight_(46)
+							,
+
+							playButton = Button.new()
+							.states_([
+								["►", skin.string, skin.background],
+								["►", skin.background, skin.string]
+							])
+							// .focus(true)
+							.canFocus_(false)
+							// .fixedHeight_(32)
+							.fixedHeight_(46)
+							.action_({arg button;
+								// 	[{player.pause}, {player.play}][button.value].value;
+								button.value_(button.value.asBoolean.not.asInteger); //ugly - reset state
+								player.play
+							})
+							// .mouseDownAction_({
+							// 	false;
+							// })
+							// .mouseUpAction_({
+							// 	player.play;
+							// 	false;
+							// })
+							.fixedWidth_(80),
+
+							pauseButton = Button.new()
+							.states_([
+								["❙❙", skin.string, skin.background],
+								["❙❙", skin.background, skin.string]
+							])
+							.canFocus_(false)
+							// .action_({arg button; player.pause})
+							.mouseDownAction_({false;})
+							.mouseUpAction_({
+								player.pause;
+								false;
+							})
+							.fixedWidth_(46)
+							.fixedHeight_(46)
+						).spacing_(0),
+						HLayout(
+							Button.new()
+							.states_([["❙◀️", skin.string, skin.background]])
+							.canFocus_(false)
+							.action_({arg button; player.startTime_(0)})
+							.fixedWidth_(50)
+							.fixedHeight_(30)
+							,
+							StaticText()
+							// .font_(Font(size: 8))
+							.stringColor_(skin.string)
+							.string_("cue:")
+							.align_(\center)
+							,
+
+							Button.new()
+							.states_([["❙◀️◀️", skin.string, skin.background]])
+							.canFocus_(false)
+							.font_(Font(size: 10))
+							.fixedWidth_(40)
+							.fixedHeight_(30)
+							.action_({
+								this.goToPreviousCue;
+							})
+							// .action_({arg button; player.pause}) //previous cue from menu
+							,
+							Button.new()
+							.states_([["►►❙", skin.string, skin.background]])
+							.canFocus_(false)
+							.font_(Font(size: 10))
+							.fixedWidth_(40)
+							.fixedHeight_(30)
+							.action_({
+								this.goToNextCue;
+							})
+							// .action_({arg button; player.pause}) //next cue from menu
+							,
+						).spacing_(0)
+					),
+
 					GridLayout.rows(
+
+						[
+							StaticText()
+							.string_("Amplitude (in dB)")
+							.stringColor_( skin.string),
+
+							ampNumber = NumberBox()
+							.value_(player.amp.ampdb)
+							.background_(skin.background)
+							.normalColor_( skin.string)
+							.action_({arg view;
+								player.amp_(view.value.dbamp, \number);
+								// ampSlider.value_(ampSpec.unmap(me.value);
+								// view.focus(true));
+								view.focus(false);
+							}).maxWidth_(50),
+						],
 						[
 							[
-								HLayout(
-									nil,
-									timeString = StaticText()
-									.font_(Font("Arial", 72))
-									.stringColor_(skin.string)
-									.align_(\right)
-									// .string_(player.startTime.asTimeString[3..10])
-									// .string_(0.asTimeString[3..7])
-									.minWidth_(200),
-									VLayout(
-										26,
-										timeStringSm = StaticText()
-										.font_(Font("Arial", 36))
-										.stringColor_(skin.string)
-										// .string_(player.startTime.asTimeString[3..10])
-										// .string_("00")
-										.fixedWidth_(60),
-									)
-								),
-								rows: 3
-							],
-
-							[
-								HLayout(
-									Button.new()
-									.states_([["❙◀️", skin.string, skin.background]])
-									.canFocus_(false)
-									.action_({arg button; player.startTime_(0)})
-									.maxWidth_(34)
-									.fixedHeight_(30)
-									,
-									4,
-									Button.new()
-									.states_([["❙◀️◀️", skin.string, skin.background]])
-									.canFocus_(false)
-									.font_(Font(size: 10))
-									.maxWidth_(30)
-									.fixedHeight_(30)
-									.action_({
-										this.goToPreviousCue;
-									})
-									// .action_({arg button; player.pause}) //previous cue from menu
-									,
-									Button.new()
-									.states_([["►►❙", skin.string, skin.background]])
-									.canFocus_(false)
-									.font_(Font(size: 10))
-									.maxWidth_(30)
-									.fixedHeight_(30)
-									.action_({
-										this.goToNextCue;
-									})
-									// .action_({arg button; player.pause}) //next cue from menu
-									,
-
-									20,
-									Button.new()
-									.states_([
-										["◼", skin.string, skin.background]])
-									.canFocus_(false)
-									.action_({player.stop})
-									.maxWidth_(30)
-									.fixedHeight_(34)
-									,
-
-									playButton = Button.new()
-									.states_([
-										["►", skin.string, skin.background],
-										["►", skin.background, skin.string]
-									])
-									// .focus(true)
-									.canFocus_(false)
-									// .fixedHeight_(32)
-									.fixedHeight_(34)
-									.action_({arg button;
-									// 	[{player.pause}, {player.play}][button.value].value;
-										button.value_(button.value.asBoolean.not.asInteger); //ugly - reset state
-										player.play
-									})
-									// .mouseDownAction_({
-									// 	false;
-									// })
-									// .mouseUpAction_({
-									// 	player.play;
-									// 	false;
-									// })
-									.fixedWidth_(60),
-
-									pauseButton = Button.new()
-									.states_([
-										["❙❙", skin.string, skin.background],
-										["❙❙", skin.background, skin.string]
-									])
-									.canFocus_(false)
-									// .action_({arg button; player.pause})
-									.mouseDownAction_({false;})
-									.mouseUpAction_({
-										player.pause;
-										false;
-									})
-									.maxWidth_(30)
-									.fixedHeight_(34)
-
-								),
-								columns: 3
-							],
-
-
-
+								ampSlider = Slider()
+								.value_(ampSpec.unmap(player.amp))
+								.canFocus_(false)
+								.orientation_(\horizontal)
+								.maxHeight_(20)
+								// .maxWidth_(200)
+								.mouseDownAction_({arg view, x, y, mod, button, cCount;
+									"mousedown fires".postln;
+									if((button == 0) && (cCount > 1), {
+										{player.amp_(1)}.defer(0.05); //dirty...
+									});
+									0; //return non-bool to maintain view's response
+								})
+								.action_({arg me;
+									player.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
+									// ampNumber.value_(ampSpec.map(me.value).round(0.1))
+								}),
+								columns: 2
+							]
+						],
+						[
 							StaticText()
 							.string_("Outbus")
 							.stringColor_(skin.string),
 							// outMenu = PopUpMenu()
 							// .items_(player.server.options.numAudioBusChannels.collect({arg i; i.asString})) //fixme this might need updating after boot!
+
 							outMenu = NumberBox()
 							.value_(player.outbus ?? {0})
 							.action_({arg menu; player.outbus_(menu.value, false)})
@@ -713,115 +758,29 @@ SFPlayerView {
 							.step_(1)
 							.background_(skin.background)
 							.focus(false)
-							.maxWidth_(120),
-
-
-							StaticText()
-							.string_("Play rate")
-							.stringColor_(skin.string),
-
-							rateNumber = NumberBox()
-							.value_(player.rate ?? {1})
-							.action_({arg view; player.rate_(view.value)})
-							.stringColor_( skin.string )
-							.normalColor_( skin.string )
-							.clipLo_(0)
-							.clipHi_(player.bufsize / (2 * player.server.options.blockSize))
-							.background_(skin.background)
-							,
-
-							nil,
-						], [
-							nil,
-
-							StaticText()
-							.string_("Amplitude (in dB)")
-							.stringColor_( skin.string),
-							nil,
-							ampNumber = NumberBox()
-							.value_(player.amp.ampdb)
-							.action_({arg view;
-								player.amp_(view.value.dbamp, \number);
-								// ampSlider.value_(ampSpec.unmap(me.value);
-								// view.focus(true));
-								view.focus(false);
-							}).maxWidth_(50),
-
-							StaticText()
-							.string_("addAction")
-							.stringColor_(skin.string),
-							addActionMenu = PopUpMenu()
-							.items_(this.getAddActionsArray)
-							.value_(this.getAddActionIndex(player.addAction))
-							.action_({arg view; player.addAction_(view.value); view.focus(false)})
-							.stringColor_( skin.string )
-							.background_(skin.background)
-							.maxWidth_(120)
-							,
-
-							nil,
-
-							Button.new()
-							.states_([
-								["Scope On", skin.string, skin.background],
-								["Scope Off", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({arg button;
-								[
-									{scope.window.close},
-									{scope = player.server.scope(player.sf.numChannels, player.outbus)}
-								][button.value].value;
-							}),
-
-							nil,
-						], [
-							nil,
-
-							[
-								ampSlider = Slider()
-								.value_(ampSpec.unmap(player.amp))
-								.canFocus_(false)
-								.orientation_(\horizontal)
-								.action_({arg me;
-									player.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
-									// ampNumber.value_(ampSpec.map(me.value).round(0.1))
-								}),
-								columns: 3
-							],
-
-
-							StaticText()
-							.string_("Target")
-							.stringColor_(skin.string),
-							{
-								var previousString = "";
-								targetText = TextField()
-								.value_(player.target.asString)
-								.action_({arg view; player.target_(view.value.interpret); view.focus(false); previousString = view.value;})
-								.stringColor_( skin.string )
-								.background_(skin.background)
-								.focusLostAction_({|view| if(previousString != view.string, {view.doAction})}) //execute when lost focus only if the string changed
-								.maxWidth_(120)
-							}.(),
-
-							Button.new()
-							.states_([
-								["Reload sndfile", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({player.reset; player.runSetup}),
-							Button.new()
-							.states_([
-								["Reset", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({player.reset}),
-							nil,
+							.fixedWidth_(50),
 						]
-
-					).hSpacing_(16),
-					nil
+					),
+					nil,
+					VLayout(
+						advancedButton = Button()
+						.states_([
+							["Advanced\noptions", skin.string, skin.background],
+							["Advanced\noptions", skin.background, skin.string]
+						])
+						.canFocus_(false)
+						.action_({arg view;
+							bottomView.visible_(view.value.asBoolean);
+						})
+						,
+						nil,
+						Button.new()
+						.states_([
+							["Reset", skin.string, skin.background]
+						])
+						.canFocus_(false)
+						.action_({player.reset}),
+					)
 				).margins_([0, 0, 0, 0]), //end of top section with time, play/stop, amp etc
 				[
 					VLayout(
@@ -895,142 +854,283 @@ SFPlayerView {
 
 				//bottom secion
 				/* cues */
-				HLayout(
-					GridLayout.rows(
-						[
-							StaticText()
-							.string_("Play From Cue:")
-							.stringColor_( skin.string)
-							.minWidth_(100),
+				bottomView = View().layout_(
+					HLayout(
+						GridLayout.rows(//cues
 							[
-								cueMenu = PopUpMenu()
-								.items_(player.cues.asArray)
-								.stringColor_(skin.string)
-								.background_(skin.background)
-								.canFocus_(false)
-								.allowsReselection_(true)
-								// .mouseUpAction_({"MouseUp".postln;})
-								// .mouseDownAction_({arg view;
-								// player.isPlaying.if({player.wasPlaying = true;player.stop});
-								// view.value_(0)
-								// })
-								.action_({arg thisMenu;
-									var idx;
-									idx = thisMenu.value - 1;
-									(idx >= 0).if({
-										player.playFromCue(player.cues[idx][0], idx);
-									}, {
-										player.playFromCue(\none, -1)
-									});
-									// player.wasPlaying.if({player.play; player.wasPlaying = false;})
-								})
-								.minWidth_(300),
-								columns: 2
+								[
+									StaticText()
+									.string_("Cues")
+									.stringColor_( skin.string)
+									.align_(\center),
+									columns: 5
+								],
 							],
-							Button()
-							.states_([
-								["Load cues", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({
-								player.loadCues
-							}),
-							Button()
-							.states_([
-								["Save cues", skin.string, skin.background]
-							])
-							.canFocus_(false)
-							.action_({
-								player.saveCues
-							}),
-							StaticText()
-							.string_("Add cues (\\key or [\\key, time])") // time can be a number in seconds or string "(hh:)mm:ss.xxx"; if \key alone is provided, current cursor time is used
-							.stringColor_(skin.string)
-							// .minWidth_(220)
-							,
-							TextField()
-							.action_({arg view;
-								var vals;
-								vals = view.string.interpret;
-								vals.isKindOf(Symbol).if({
-									vals = [vals, nil]
-								}); //take time from the cursor
-								vals = vals.collect({arg val, inc; val.isKindOf(String).if({val.asSecs}, {val})}); //convert time string to seconds
-								vals.isKindOf(Array).if({
-									vals = vals.flat.clump(2);
-								}, {
-									vals = vals.asArray.flat.clump(2)
-								});
-								vals[0].isKindOf(Array).if({
-									vals.do({arg thisPair;
-										player.addCue(thisPair[0], thisPair[1], false)
+							[
+								StaticText()
+								.string_("Time offset:")
+								.stringColor_(skin.string),
+								cueOffsetNum = NumberBox()
+								.value_(0)
+								.background_(skin.background)
+								.normalColor_( skin.string)
+								.action_({arg thisBox;
+									player.offset_(thisBox.value);
+									view.focus(true)
+								})
+								.maxWidth_(60),
+
+								StaticText()
+								.string_("Cue:")
+								.stringColor_( skin.string)
+								.align_(\right)
+								,
+								[
+									cueMenu = PopUpMenu()
+									.items_(player.cues.asArray)
+									.stringColor_(skin.string)
+									.background_(skin.background)
+									.canFocus_(false)
+									.allowsReselection_(true)
+									// .mouseUpAction_({"MouseUp".postln;})
+									// .mouseDownAction_({arg view;
+									// player.isPlaying.if({player.wasPlaying = true;player.stop});
+									// view.value_(0)
+									// })
+									.action_({arg thisMenu;
+										var idx;
+										idx = thisMenu.value - 1;
+										(idx >= 0).if({
+											player.playFromCue(player.cues[idx][0], idx);
+										}, {
+											player.playFromCue(\none, -1)
+										});
+										// player.wasPlaying.if({player.play; player.wasPlaying = false;})
+									})
+									.minWidth_(300),
+									columns: 1
+								],
+
+								Button()
+								.states_([
+									["Load cues", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({
+									player.loadCues
+								}),
+							],
+							[
+								[
+									StaticText()
+									.string_("Add cues (\\key or [\\key, time])") // time can be a number in seconds or string "(hh:)mm:ss.xxx"; if \key alone is provided, current cursor time is used
+									.stringColor_(skin.string)
+									// .minWidth_(220)
+									,
+									columns: 3
+								],
+								TextField()
+								.stringColor_( skin.string)
+								.background_(skin.background)
+								.action_({arg view;
+									var vals;
+									vals = view.string.interpret;
+									vals.isKindOf(Symbol).if({
+										vals = [vals, nil]
+									}); //take time from the cursor
+									vals = vals.collect({arg val, inc; val.isKindOf(String).if({val.asSecs}, {val})}); //convert time string to seconds
+									vals.isKindOf(Array).if({
+										vals = vals.flat.clump(2);
+									}, {
+										vals = vals.asArray.flat.clump(2)
+									});
+									vals[0].isKindOf(Array).if({
+										vals.do({arg thisPair;
+											player.addCue(thisPair[0], thisPair[1], false)
+										});
+										player.sortCues;
+									}, {
+										player.addCue(vals[0], vals[1], true)
+									});
+									view.focus(false);
+									view.string_("");
+								}),
+								Button()
+								.states_([
+									["Save cues", skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({
+									player.saveCues
+								}),
+							],
+							[
+								[
+									StaticText()
+									.string_("Remove cues (\\key or [\\key])")
+									.stringColor_(skin.string)
+									.minWidth_(200)
+									,
+									columns: 3
+								],
+								TextField()
+								.stringColor_( skin.string)
+								.background_(skin.background)
+								.action_({arg view;
+									var vals;
+									vals = view.string.interpret;
+									vals.isKindOf(Array).if({
+										vals = vals.flat;
+									}, {
+										vals = vals.asArray
+									});
+									vals.do({arg thisKey;
+										player.removeCue(thisKey, false)
 									});
 									player.sortCues;
-								}, {
-									player.addCue(vals[0], vals[1], true)
-								});
-								view.focus(false);
-								view.string_("");
-							}),
+									view.focus(false);
+									view.string_("");
+								}),
+								Button()
+								.states_([
+									["Hide cues",  skin.string, skin.background],
+									["Show cues",  skin.string, skin.background]
+								])
+								.canFocus_(false)
+								.action_({arg button;
+									(button.value == 0).if({
+										this.drawCues
+									}, {
+										this.hideCues
+									})
+								}),
+							]
+						),
+						20, //space
+						GridLayout.rows( //playback
+							[
 
-							// [nil, rows: 2, stretch: 1]
-						], [
+								[
+									StaticText()
+									.string_("Playback")
+									.stringColor_( skin.string)
+									.align_(\center),
+									columns: 2
+								],
+							],
+							[
+								StaticText()
+								.string_("addAction")
+								.stringColor_(skin.string),
+
+								addActionMenu = PopUpMenu()
+								.items_(this.getAddActionsArray)
+								.value_(this.getAddActionIndex(player.addAction))
+								.action_({arg view; player.addAction_(view.value); view.focus(false)})
+								.stringColor_( skin.string )
+								.background_(skin.background)
+								// .maxWidth_(120)
+								,
+							],
+							[
+								StaticText()
+								.string_("Target")
+								.stringColor_(skin.string),
+
+								{
+									var previousString = "";
+									targetText = TextField()
+									.value_(player.target.asString)
+									.action_({arg view; player.target_(view.value.interpret); view.focus(false); previousString = view.value;})
+									.stringColor_( skin.string )
+									.background_(skin.background)
+									.focusLostAction_({|view| if(previousString != view.string, {view.doAction})}) //execute when lost focus only if the string changed
+									// .maxWidth_(120)
+								}.(),
+							],
+							[
+								StaticText()
+								.string_("Play rate")
+								.stringColor_(skin.string),
+
+								rateNumber = NumberBox()
+								.value_(player.rate ?? {1})
+								.action_({arg view; player.rate_(view.value)})
+								.stringColor_( skin.string )
+								.normalColor_( skin.string )
+								.clipLo_(0)
+								.clipHi_(player.bufsize / (2 * player.server.options.blockSize))
+								.background_(skin.background)
+							]
+						),
+						20, //space
+						VLayout(//soundfile
 							StaticText()
-							.string_("Cue offset:")
-							.stringColor_(skin.string),
-							cueOffsetNum = NumberBox()
-							.value_(0)
-							.action_({arg thisBox;
-								player.offset_(thisBox.value);
-								view.focus(true)
-							})
-							.maxWidth_(60),
-							nil,
-							Button()
+							.string_("Sound File")
+							.stringColor_( skin.string)
+							.align_(\center),
+
+							Button.new()
 							.states_([
-								["Hide cues",  skin.string, skin.background],
-								["Show cues",  skin.string, skin.background]
+								["Open new", skin.string, skin.background]
+							])
+							.canFocus_(false)
+							.action_({
+								player.loadFromOpenPanel;
+								player.reset;
+							}),
+							Button.new()
+							.states_([
+								["Reload", skin.string, skin.background]
+							])
+							.canFocus_(false)
+							.action_({player.reset; player.runSetup}),
+							nil
+						),
+
+						VLayout(//misc
+							StaticText()
+							.string_("Miscellaneous")
+							.stringColor_( skin.string)
+							.align_(\center),
+
+							Button.new()
+							.states_([
+								["Scope On", skin.string, skin.background],
+								["Scope Off", skin.string, skin.background]
 							])
 							.canFocus_(false)
 							.action_({arg button;
-								(button.value == 0).if({
-									this.drawCues
-								}, {
-									this.hideCues
-								})
+								[
+									{scope.window.close},
+									{scope = player.server.scope(player.sf.numChannels, player.outbus)}
+								][button.value].value;
 							}),
-							nil,
-							StaticText()
-							.string_("Remove cues (\\key or [\\key])")
-							.stringColor_(skin.string)
-							.minWidth_(200)
-							,
-							TextField()
-							.action_({arg view;
-								var vals;
-								vals = view.string.interpret;
-								vals.isKindOf(Array).if({
-									vals = vals.flat;
-								}, {
-									vals = vals.asArray
-								});
-								vals.do({arg thisKey;
-									player.removeCue(thisKey, false)
-								});
-								player.sortCues;
-								view.focus(false);
-								view.string_("");
-							})
-						]
-					).hSpacing_(12).vSpacing_(4),
-					[nil, stretch: 1]
-				)
-			)
+							nil
+						),
+
+						nil, //space on the right
+						// [nil, stretch: 1] //space on the right?
+					).margins_([0, 0, 0, 0])
+				).visible_(false)
+			);
 		);
 		// window.front; //
 		player.addDependant(this);
 		this.loadSF;
 	}
+
+	advanced {
+		^bottomView.visible;
+	}
+
+	advanced_ {arg bool;
+		bool ?? {bool = this.advanced.not};
+		bool = bool.asBoolean;
+		advancedButton.value_(bool.asInteger);
+		bottomView.visible_(bool)
+	}
+
 
 	getAddActionsArray {
 		^Node.addActions.select({|key, val| val.asString.size > 1}).getPairs.clump(2).sort({|a, b| a[1] < b[1]}).flop[0]
@@ -1173,7 +1273,7 @@ SFPlayerView {
 					\amp, {
 						if(args[1] != \number, {
 							ampNumber.value_(value.ampdb.round(0.1));
-						}, {"not updating number".postln;});
+						});
 						if(args[1] != \slider, {
 							ampSlider.value_(ampSpec.unmap(value.ampdb));
 						});
