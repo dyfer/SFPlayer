@@ -8,7 +8,7 @@ SFPlayer {
 	var <>duplicateSingleChannel = true;
 	var rateVar, addActionVar, targetVar, bufsizeVar, <>multiplyBufsizeByNumChannels = true;
 	var <>switchTargetWhilePlaying = true;
-	var <guiObject;
+	var <view;
 	var <attRelTime = 0.02;
 	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
 
@@ -290,10 +290,10 @@ SFPlayer {
 	}
 
 	gui {arg argBounds, doneAction, parent;
-		if(guiObject.isNil, {
-			guiObject = SFPlayerView(this, argBounds, doneAction, parent)
+		if(view.isNil, {
+			view = SFPlayerView(this, argBounds, doneAction, parent)
 		}, {
-			guiObject.front;
+			view.front;
 		});
 	}
 
