@@ -417,6 +417,7 @@ SFPlayer {
 			isStarting = false;
 			this.startTime_(0);
 			this.amp_(1);
+			this.rate_(1);
 		}.defer(0.11) //fixme: do we need defer here?
 	}
 
@@ -478,7 +479,7 @@ SFPlayerSkin {
 SFPlayerView {
 	var <player;
 	var <bounds, <parent, <doneAction, <skin, <>stopPlayerOnClose;
-	var <window, <view, outMenu, playButton, ampSlider, ampNumber, targetText, addActionMenu;
+	var <window, <view, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
 	var <timeString, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
@@ -488,6 +489,7 @@ SFPlayerView {
 	var ampSpec;
 	var <>updateTime = 0.05;
 	var isSelectingNewStartTime = false; //changes to true when setting soundfileview's cursor; used to prevent updating then
+	var <>requireShiftSpaceForPause = false;
 
 	*new {arg player, bounds, doneAction, parent, skin, stopPlayerOnClose = true;
 		^super.newCopyArgs(player, bounds, parent, doneAction, skin, stopPlayerOnClose).makeGui;
@@ -516,6 +518,40 @@ SFPlayerView {
 				if(player.isPlaying.not, {player.startTime_(0)});
 			});
 		});// set startTime to 0 when clicking to the left of the soundfileview
+
+		view.keyDownAction_({arg view, char, modifiers, unicode, keycode, key;
+			key.switch(
+				32, { //space
+					if(player.isPlaying, {
+						if(requireShiftSpaceForPause, {
+							if(modifiers == 131072, {
+								player.pause;
+							})
+						}, {
+							player.pause;
+						});
+					}, {
+						player.play;
+					})
+				},
+				83, { //s - stop
+					player.stop;
+				},
+				80, { //p - pause
+					player.pause;
+				},
+				16777216, {//esc - go to 0
+					player.startTime_(0);
+				},
+				16777234, {// left arrow
+					cueMenu.valueAction_(cueMenu.value - 1)
+				},
+				16777236, {//right arrow
+					cueMenu.valueAction_(cueMenu.value + 1)
+				}
+			)
+		});// set startTime to 0 when clicking to the left of the soundfileview
+
 		// timeGrid = DrawGrid(nil, ControlSpec(0, player.sf.duration, units: \s).grid, nil);
 		timeGrid = DrawGrid(nil, nil, nil);
 		timeGrid.fontColor_(skin.string);
@@ -545,20 +581,94 @@ SFPlayerView {
 								.font_(Font("Arial", 72))
 								.stringColor_(skin.string)
 								// .string_(player.startTime.asTimeString[3..10])
-								.fixedWidth_(300),
+								.string_(0.asTimeString[3..10])
+								.fixedWidth_(280),
 								rows: 3
 							],
 
-							playButton = Button.new()
-							.states_([
-								["►", skin.string, skin.background],
-								["❙❙", skin.string, skin.background]])
-							.focus(true)
-							.fixedHeight_(32)
-							.action_({arg button;
-								[{player.pause}, {player.play}][button.value].value;
-							})
-							.minWidth_(120),
+							[
+								HLayout(
+									Button.new()
+									.states_([["⏮", skin.string, skin.background]])
+									.canFocus_(false)
+									.action_({arg button; player.startTime_(0)})
+									.maxWidth_(30)
+									.fixedHeight_(30)
+									,
+									Button.new()
+									.states_([["⏪︎", skin.string, skin.background]])
+									.canFocus_(false)
+									.maxWidth_(30)
+									.fixedHeight_(30)
+									.action_({
+										cueMenu.valueAction_(cueMenu.value - 1)
+									})
+									// .action_({arg button; player.pause}) //previous cue from menu
+									,
+									Button.new()
+									.states_([["⏩︎", skin.string, skin.background]])
+									.canFocus_(false)
+									.maxWidth_(30)
+									.fixedHeight_(30)
+									.action_({
+										cueMenu.valueAction_(cueMenu.value + 1)
+									})
+									// .action_({arg button; player.pause}) //next cue from menu
+									,
+
+									20,
+									Button.new()
+									.states_([
+										["◼", skin.string, skin.background]])
+									.canFocus_(false)
+									.action_({player.stop})
+									.maxWidth_(30)
+									.fixedHeight_(34)
+									,
+
+									playButton = Button.new()
+									.states_([
+										["►", skin.string, skin.background],
+										["►", skin.background, skin.string]
+									])
+									// .focus(true)
+									.canFocus_(false)
+									// .fixedHeight_(32)
+									.fixedHeight_(34)
+									.action_({arg button;
+									// 	[{player.pause}, {player.play}][button.value].value;
+										button.value_(button.value.asBoolean.not.asInteger); //ugly - reset state
+										player.play
+									})
+									// .mouseDownAction_({
+									// 	false;
+									// })
+									// .mouseUpAction_({
+									// 	player.play;
+									// 	false;
+									// })
+									.fixedWidth_(60),
+
+									pauseButton = Button.new()
+									.states_([
+										["❙❙", skin.string, skin.background],
+										["❙❙", skin.background, skin.string]
+									])
+									.canFocus_(false)
+									// .action_({arg button; player.pause})
+									.mouseDownAction_({false;})
+									.mouseUpAction_({
+										player.pause;
+										false;
+									})
+									.maxWidth_(30)
+									.fixedHeight_(34)
+
+								),
+								columns: 3
+							],
+
+
 
 							StaticText()
 							.string_("Outbus")
@@ -570,7 +680,7 @@ SFPlayerView {
 							.action_({arg menu; player.outbus_(menu.value, false)})
 							.keyDownAction_({arg view, char, modifiers, unicode, keycode, key;
 								// char.postln; unicode.postln;
-								if((unicode == 3) || (unicode == 13), {playButton.focus(true)}); //focus on play only after Enter/Return
+								if((unicode == 3) || (unicode == 13), {view.focus(true)}); //focus on play only after Enter/Return
 							})
 							.stringColor_( skin.string )
 							.normalColor_( skin.string )
@@ -580,8 +690,27 @@ SFPlayerView {
 							.background_(skin.background)
 							.maxWidth_(120),
 
+
 							StaticText()
-							.string_("Amplitude (in db)")
+							.string_("Play rate")
+							.stringColor_(skin.string),
+
+							rateNumber = NumberBox()
+							.value_(player.rate ?? {1})
+							.action_({arg view; player.rate_(view.value)})
+							.stringColor_( skin.string )
+							.normalColor_( skin.string )
+							.clipLo_(0)
+							.clipHi_(player.bufsize / (2 * player.server.options.blockSize))
+							.background_(skin.background)
+							,
+
+							nil,
+						], [
+							nil,
+
+							StaticText()
+							.string_("Amplitude (in dB)")
 							.stringColor_( skin.string),
 							nil,
 							ampNumber = NumberBox()
@@ -589,19 +718,9 @@ SFPlayerView {
 							.action_({arg me;
 								player.amp_(me.value.dbamp, \number);
 								// ampSlider.value_(ampSpec.unmap(me.value);
-								// playButton.focus(true));
-								playButton.focus(true);
-							}).maxWidth_(60),
-
-							nil,
-						], [
-							nil,
-
-							Button.new()
-							.states_([
-								["◼", skin.string, skin.background]])
-							.canFocus_(false)
-							.action_({player.stop}),
+								// view.focus(true));
+								view.focus(true);
+							}).maxWidth_(50),
 
 							StaticText()
 							.string_("addAction")
@@ -609,25 +728,12 @@ SFPlayerView {
 							addActionMenu = PopUpMenu()
 							.items_(this.getAddActionsArray)
 							.value_(this.getAddActionIndex(player.addAction))
-							.action_({arg menu; player.addAction_(menu.value); playButton.focus(true)})
+							.action_({arg menu; player.addAction_(menu.value); view.focus(true)})
 							.stringColor_( skin.string )
 							.background_(skin.background)
 							.maxWidth_(120)
 							,
 
-							[
-								ampSlider = Slider()
-								.value_(ampSpec.unmap(player.amp))
-								.canFocus_(false)
-								.orientation_(\horizontal)
-								.action_({arg me;
-									player.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
-									// ampNumber.value_(ampSpec.map(me.value).round(0.1))
-								}),
-								columns: 3
-							],
-							nil
-						], [
 							nil,
 
 							Button.new()
@@ -643,6 +749,23 @@ SFPlayerView {
 								][button.value].value;
 							}),
 
+							nil,
+						], [
+							nil,
+
+							[
+								ampSlider = Slider()
+								.value_(ampSpec.unmap(player.amp))
+								.canFocus_(false)
+								.orientation_(\horizontal)
+								.action_({arg me;
+									player.amp_(ampSpec.map(me.value).round(0.1).dbamp, \slider);
+									// ampNumber.value_(ampSpec.map(me.value).round(0.1))
+								}),
+								columns: 3
+							],
+
+
 							StaticText()
 							.string_("Target")
 							.stringColor_(skin.string),
@@ -650,7 +773,7 @@ SFPlayerView {
 								var previousString = "";
 								targetText = TextField()
 								.value_(player.target.asString)
-								.action_({arg view; player.target_(view.value.interpret); playButton.focus(true); previousString = view.value;})
+								.action_({arg view; player.target_(view.value.interpret); view.focus(true); previousString = view.value;})
 								.stringColor_( skin.string )
 								.background_(skin.background)
 								.focusLostAction_({|view| if(previousString != view.string, {view.doAction})}) //execute when lost focus only if the string changed
@@ -659,14 +782,16 @@ SFPlayerView {
 
 							Button.new()
 							.states_([
+								["Reload sndfile", skin.string, skin.background]
+							])
+							.canFocus_(false)
+							.action_({player.reset; player.runSetup}),
+							Button.new()
+							.states_([
 								["Reset", skin.string, skin.background]
 							])
 							.canFocus_(false)
 							.action_({player.reset}),
-
-							nil,
-							nil,
-							nil,
 							nil,
 						]
 
@@ -819,7 +944,7 @@ SFPlayerView {
 								}, {
 									player.addCue(vals[0], vals[1], true)
 								});
-								playButton.focus(true);
+								view.focus(true);
 								me.string_("");
 							}),
 
@@ -832,7 +957,7 @@ SFPlayerView {
 							.value_(0)
 							.action_({arg thisBox;
 								player.offset_(thisBox.value);
-								playButton.focus(true)
+								view.focus(true)
 							})
 							.maxWidth_(60),
 							nil,
@@ -868,7 +993,7 @@ SFPlayerView {
 									player.removeCue(thisKey, false)
 								});
 								player.sortCues;
-								playButton.focus(true);
+								view.focus(true);
 								me.string_("");
 							})
 						]
@@ -1014,6 +1139,9 @@ SFPlayerView {
 							outMenu.value_(value)
 						})
 					},
+					\rate, {
+						rateNumber.value_(value);
+					},
 					\isPlaying, {
 						if(value, {
 							this.playGUIRoutine;
@@ -1021,6 +1149,13 @@ SFPlayerView {
 						}, {
 							this.stopGUIRoutine;
 							playButton.value_(0);
+						})
+					},
+					\isPaused, {
+						if(value, {
+							pauseButton.value_(1);
+						}, {
+							pauseButton.value_(0);
 						})
 					},
 					\startTime, {
