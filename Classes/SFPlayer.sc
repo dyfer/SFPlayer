@@ -487,6 +487,7 @@ SFPlayerView {
 	// var tempBounds, tempAction;
 	// var curTime; // here vs player???
 	var ampSpec;
+	var <showHours = false; //set automatically at load
 	var <>updateTime = 0.1;
 	var isSelectingNewStartTime = false; //changes to true when setting soundfileview's cursor; used to prevent updating then
 	var <>requireShiftSpaceForPause = false;
@@ -542,8 +543,9 @@ SFPlayerView {
 					player.pause;
 				},
 				16777216, {//esc - go to 0
-					player.stop(false);
-					player.startTime_(0);
+					if(player.isPlaying.not, {
+						player.startTime_(0);
+					});
 				},
 				16777234, {// left arrow
 					this.goToPreviousCue;
@@ -584,19 +586,21 @@ SFPlayerView {
 						[
 							[
 								HLayout(
+									nil,
 									timeString = StaticText()
 									.font_(Font("Arial", 72))
 									.stringColor_(skin.string)
+									.align_(\right)
 									// .string_(player.startTime.asTimeString[3..10])
-									.string_(0.asTimeString[3..7])
-									.fixedWidth_(184),
+									// .string_(0.asTimeString[3..7])
+									.minWidth_(200),
 									VLayout(
 										26,
 										timeStringSm = StaticText()
 										.font_(Font("Arial", 36))
 										.stringColor_(skin.string)
 										// .string_(player.startTime.asTimeString[3..10])
-										.string_("00")
+										// .string_("00")
 										.fixedWidth_(60),
 									)
 								),
@@ -606,15 +610,17 @@ SFPlayerView {
 							[
 								HLayout(
 									Button.new()
-									.states_([["⏮", skin.string, skin.background]])
+									.states_([["❙◀️", skin.string, skin.background]])
 									.canFocus_(false)
 									.action_({arg button; player.startTime_(0)})
-									.maxWidth_(30)
+									.maxWidth_(34)
 									.fixedHeight_(30)
 									,
+									4,
 									Button.new()
-									.states_([["⏪︎", skin.string, skin.background]])
+									.states_([["❙◀️◀️", skin.string, skin.background]])
 									.canFocus_(false)
+									.font_(Font(size: 10))
 									.maxWidth_(30)
 									.fixedHeight_(30)
 									.action_({
@@ -623,8 +629,9 @@ SFPlayerView {
 									// .action_({arg button; player.pause}) //previous cue from menu
 									,
 									Button.new()
-									.states_([["⏩︎", skin.string, skin.background]])
+									.states_([["►►❙", skin.string, skin.background]])
 									.canFocus_(false)
+									.font_(Font(size: 10))
 									.maxWidth_(30)
 									.fixedHeight_(30)
 									.action_({
@@ -1053,7 +1060,7 @@ SFPlayerView {
 				// timeString.string_(curTime.round(0.01).asTimeString[3..10]);
 				this.setTimeString(curTime);
 				updateTime.wait;
-			})
+			});
 		}, clock: AppClock)
 	}
 
@@ -1067,8 +1074,13 @@ SFPlayerView {
 	}
 
 	setTimeString {arg secs;
-		timeString.string_(secs.floor.asTimeString[3..7]);
-		timeStringSm.string_(secs.round(0.01).frac.asString[1..3]);
+		var big, small, str, strBeginning;
+		strBeginning = showHours.if({0}, {3});
+		str = secs.asTimeString;
+		big = str[strBeginning..7];
+		small = str[8..10];
+		timeString.string_(big);
+		timeStringSm.string_(small);
 	}
 
 	goToNextCue {
@@ -1142,7 +1154,7 @@ SFPlayerView {
 			sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
 
 			window !? {window.name_(player.path.basename)};
-			// timeString.string_(player.startTime.asTimeString[3..10]);
+			if(player.sf.duration >=3600, {showHours = true}, {showHours = false});
 			this.setTimeString(player.startTime);
 		})
 	}
