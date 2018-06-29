@@ -146,8 +146,8 @@ SFPlayer {
 	rate {^rateVar}
 	rate_ {arg val;
 		rateVar = val;
-		clock !? {clock.tempo = rateVar};
-		curSynth.set(\rate, this.rate);
+		try{clock.tempo = rateVar};
+		curSynth !? {curSynth.set(\rate, this.rate)};
 		this.changed(\rate, this.rate);
 	}
 
@@ -482,12 +482,12 @@ SFPlayerView {
 	var <window, <view, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
-	var <timeString, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
+	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
 	var <skin;
 	// var tempBounds, tempAction;
 	// var curTime; // here vs player???
 	var ampSpec;
-	var <>updateTime = 0.05;
+	var <>updateTime = 0.1;
 	var isSelectingNewStartTime = false; //changes to true when setting soundfileview's cursor; used to prevent updating then
 	var <>requireShiftSpaceForPause = false;
 
@@ -520,6 +520,7 @@ SFPlayerView {
 		});// set startTime to 0 when clicking to the left of the soundfileview
 
 		view.keyDownAction_({arg view, char, modifiers, unicode, keycode, key;
+			// key.postln;
 			key.switch(
 				32, { //space
 					if(player.isPlaying, {
@@ -541,16 +542,21 @@ SFPlayerView {
 					player.pause;
 				},
 				16777216, {//esc - go to 0
+					player.stop(false);
 					player.startTime_(0);
 				},
 				16777234, {// left arrow
-					cueMenu.valueAction_(cueMenu.value - 1)
+					this.goToPreviousCue;
 				},
 				16777236, {//right arrow
-					cueMenu.valueAction_(cueMenu.value + 1)
+					this.goToNextCue;
 				}
 			)
-		});// set startTime to 0 when clicking to the left of the soundfileview
+		});
+
+		view.focusGainedAction_({
+			outMenu.focus(false);
+		});
 
 		// timeGrid = DrawGrid(nil, ControlSpec(0, player.sf.duration, units: \s).grid, nil);
 		timeGrid = DrawGrid(nil, nil, nil);
@@ -577,12 +583,23 @@ SFPlayerView {
 					GridLayout.rows(
 						[
 							[
-								timeString = StaticText()
-								.font_(Font("Arial", 72))
-								.stringColor_(skin.string)
-								// .string_(player.startTime.asTimeString[3..10])
-								.string_(0.asTimeString[3..10])
-								.fixedWidth_(280),
+								HLayout(
+									timeString = StaticText()
+									.font_(Font("Arial", 72))
+									.stringColor_(skin.string)
+									// .string_(player.startTime.asTimeString[3..10])
+									.string_(0.asTimeString[3..7])
+									.fixedWidth_(184),
+									VLayout(
+										26,
+										timeStringSm = StaticText()
+										.font_(Font("Arial", 36))
+										.stringColor_(skin.string)
+										// .string_(player.startTime.asTimeString[3..10])
+										.string_("00")
+										.fixedWidth_(60),
+									)
+								),
 								rows: 3
 							],
 
@@ -601,7 +618,7 @@ SFPlayerView {
 									.maxWidth_(30)
 									.fixedHeight_(30)
 									.action_({
-										cueMenu.valueAction_(cueMenu.value - 1)
+										this.goToPreviousCue;
 									})
 									// .action_({arg button; player.pause}) //previous cue from menu
 									,
@@ -611,7 +628,7 @@ SFPlayerView {
 									.maxWidth_(30)
 									.fixedHeight_(30)
 									.action_({
-										cueMenu.valueAction_(cueMenu.value + 1)
+										this.goToNextCue;
 									})
 									// .action_({arg button; player.pause}) //next cue from menu
 									,
@@ -680,7 +697,7 @@ SFPlayerView {
 							.action_({arg menu; player.outbus_(menu.value, false)})
 							.keyDownAction_({arg view, char, modifiers, unicode, keycode, key;
 								// char.postln; unicode.postln;
-								if((unicode == 3) || (unicode == 13), {view.focus(true)}); //focus on play only after Enter/Return
+								if((unicode == 3) || (unicode == 13), {view.focus(false)}); //focus on play only after Enter/Return
 							})
 							.stringColor_( skin.string )
 							.normalColor_( skin.string )
@@ -688,6 +705,7 @@ SFPlayerView {
 							.clipHi_(player.server.options.numAudioBusChannels) //this might need to be updated after boot?
 							.step_(1)
 							.background_(skin.background)
+							.focus(false)
 							.maxWidth_(120),
 
 
@@ -715,11 +733,11 @@ SFPlayerView {
 							nil,
 							ampNumber = NumberBox()
 							.value_(player.amp.ampdb)
-							.action_({arg me;
-								player.amp_(me.value.dbamp, \number);
+							.action_({arg view;
+								player.amp_(view.value.dbamp, \number);
 								// ampSlider.value_(ampSpec.unmap(me.value);
 								// view.focus(true));
-								view.focus(true);
+								view.focus(false);
 							}).maxWidth_(50),
 
 							StaticText()
@@ -728,7 +746,7 @@ SFPlayerView {
 							addActionMenu = PopUpMenu()
 							.items_(this.getAddActionsArray)
 							.value_(this.getAddActionIndex(player.addAction))
-							.action_({arg menu; player.addAction_(menu.value); view.focus(true)})
+							.action_({arg view; player.addAction_(view.value); view.focus(false)})
 							.stringColor_( skin.string )
 							.background_(skin.background)
 							.maxWidth_(120)
@@ -773,7 +791,7 @@ SFPlayerView {
 								var previousString = "";
 								targetText = TextField()
 								.value_(player.target.asString)
-								.action_({arg view; player.target_(view.value.interpret); view.focus(true); previousString = view.value;})
+								.action_({arg view; player.target_(view.value.interpret); view.focus(false); previousString = view.value;})
 								.stringColor_( skin.string )
 								.background_(skin.background)
 								.focusLostAction_({|view| if(previousString != view.string, {view.doAction})}) //execute when lost focus only if the string changed
@@ -924,9 +942,9 @@ SFPlayerView {
 							// .minWidth_(220)
 							,
 							TextField()
-							.action_({arg me;
+							.action_({arg view;
 								var vals;
-								vals = me.string.interpret;
+								vals = view.string.interpret;
 								vals.isKindOf(Symbol).if({
 									vals = [vals, nil]
 								}); //take time from the cursor
@@ -944,8 +962,8 @@ SFPlayerView {
 								}, {
 									player.addCue(vals[0], vals[1], true)
 								});
-								view.focus(true);
-								me.string_("");
+								view.focus(false);
+								view.string_("");
 							}),
 
 							// [nil, rows: 2, stretch: 1]
@@ -981,9 +999,9 @@ SFPlayerView {
 							.minWidth_(200)
 							,
 							TextField()
-							.action_({arg me;
+							.action_({arg view;
 								var vals;
-								vals = me.string.interpret;
+								vals = view.string.interpret;
 								vals.isKindOf(Array).if({
 									vals = vals.flat;
 								}, {
@@ -993,8 +1011,8 @@ SFPlayerView {
 									player.removeCue(thisKey, false)
 								});
 								player.sortCues;
-								view.focus(true);
-								me.string_("");
+								view.focus(false);
+								view.string_("");
 							})
 						]
 					).hSpacing_(12).vSpacing_(4),
@@ -1032,7 +1050,8 @@ SFPlayerView {
 				var curTime;
 				curTime = player.curTime;
 				if(isSelectingNewStartTime.not, {sfView.timeCursorPosition_(curTime * player.sf.sampleRate)});
-				timeString.string_(curTime.round(0.01).asTimeString[3..10]);
+				// timeString.string_(curTime.round(0.01).asTimeString[3..10]);
+				this.setTimeString(curTime);
 				updateTime.wait;
 			})
 		}, clock: AppClock)
@@ -1045,6 +1064,19 @@ SFPlayerView {
 	hideCues {
 		cuesView.drawFunc_({});
 		cuesView.refresh;
+	}
+
+	setTimeString {arg secs;
+		timeString.string_(secs.floor.asTimeString[3..7]);
+		timeStringSm.string_(secs.round(0.01).frac.asString[1..3]);
+	}
+
+	goToNextCue {
+		try{cueMenu.valueAction_((cueMenu.value + 1).min(cueMenu.items.size - 1))};
+	}
+
+	goToPreviousCue {
+		try{cueMenu.valueAction_((cueMenu.value - 1).max(0))};
 	}
 
 	drawCues {
@@ -1110,7 +1142,8 @@ SFPlayerView {
 			sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
 
 			window !? {window.name_(player.path.basename)};
-			timeString.string_(player.startTime.asTimeString[3..10]);
+			// timeString.string_(player.startTime.asTimeString[3..10]);
+			this.setTimeString(player.startTime);
 		})
 	}
 
@@ -1136,7 +1169,8 @@ SFPlayerView {
 					\outbus, {
 						var updMenu = args[1];
 						updMenu.if({
-							outMenu.value_(value)
+							outMenu.value_(value);
+							outMenu.focus(false);
 						})
 					},
 					\rate, {
@@ -1160,7 +1194,9 @@ SFPlayerView {
 					},
 					\startTime, {
 						sfView.timeCursorPosition_((player.startTime * player.sf.sampleRate).round);
-						timeString.string_(player.startTime.asTimeString[3..10]);
+						// timeString.string_(player.startTime.asTimeString[3..10]);
+						this.setTimeString(player.startTime);
+						outMenu.focus(false);
 						// cueOffsetNum.value_(0); //not sure we need this?
 						// player.offset = 0;
 					},
