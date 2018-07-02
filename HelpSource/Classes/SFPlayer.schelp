@@ -15,16 +15,28 @@ CLASSMETHODS::
 METHOD:: new
 
 ARGUMENT:: path
-The path to a soundfile. If no path is specified specified, an Open Dialog will be shown to choose the file.
+The path to a soundfile. Can be code::nil:: for choosing the file later.
 
 ARGUMENT:: outbus
-The bus to output to
+The bus to output to. Defaults to code::0:: (the first physical output).
 
 ARGUMENT:: server
-The server to use
+The server to use. If code::nil::, code:: Server.default:: will be used.
 
 ARGUMENT:: skin
 Optionally an instance of code::SFPlayerSkin::, controlling the color scheme of the GUI when shown.
+
+ARGUMENT:: autoShowOpenDialog
+If code::true:: and no path is specified specified, an Open Dialog will be shown upon creating new instance to choose the file.
+
+ARGUMENT:: autoBootServer
+If code::true:: and the server is not running, it will be booted automatically.
+
+ARGUMENT:: autoSetSampleRate
+If code::true:: and the server is booted automatically, its sampleRate will be set to the file's sampleRate.
+
+ARGUMENT:: autoSetOutputChannels
+If code::true:: and then number of channels in the file exceeds server's number of output channels, as well as the server is booted automatically, its number of output channels will be increased to match the number of channels in the soundfile.
 
 
 INSTANCEMETHODS::
@@ -34,10 +46,16 @@ METHOD:: gui
 Show a GUI of the code::SFPlayer::. This creates an instance of code::SFPlayerView:: (but the method returns the original code::SFPlayer::).
 
 ARGUMENT:: argBounds
-Bounds
+Bounds of the gui. If code::nil::, a default size will be used.
 
 ARGUMENT:: doneAction
-Action to be performed after opening the window
+Action to be performed after opening the gui.
+
+ARGUMENT:: onCloseAction
+Action to be performed after closing the gui.
+
+ARGUMENT:: parent
+Optionally a parent view to embed this code::SFPlayerView:: in.
 
 returns:: this SFPlayer
 

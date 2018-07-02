@@ -1,5 +1,5 @@
 SFPlayer {
-	var <path, <outbus, <server, <>autoSetSampleRate, <>autoSetOutputChannels;
+	var <path, <outbus, <server, <autoShowOpenDialog, <autoBootServer, <>autoSetSampleRate, <>autoSetOutputChannels;
 	var <buffer, <sf, cond, <curSynth, <synthName;
 	var clock, <skin;
 	var <cues, offset, lastStart;
@@ -12,8 +12,8 @@ SFPlayer {
 	var <attRelTime = 0.02;
 	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
 
-	*new {arg path, outbus, server, skin, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
-		^super.newCopyArgs(path, outbus, server, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
+	*new {arg path, outbus, server, skin, autoShowOpenDialog = true, autoBootServer = true, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
+		^super.newCopyArgs(path, outbus, server, autoShowOpenDialog, autoBootServer, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
 	}
 
 	initSFPlayer {arg argSkin;
@@ -30,7 +30,7 @@ SFPlayer {
 		amp = 1;
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
-		path.isNil.if({
+		(path.isNil && autoShowOpenDialog).if({
 			this.loadFromOpenPanel;
 		}, {
 			this.runSetup;
@@ -46,30 +46,36 @@ SFPlayer {
 
 	runSetup {
 		sf = SoundFile.new;
-		{sf.openRead(path)}.try({"Soundfile could not be opened".warn});
-		cond = Condition.new;
-		if(server.options.numOutputBusChannels < sf.numChannels, {
-			if(server.serverRunning.not && autoSetOutputChannels, { //if server is not running, set the number of output channels
-				format("%: setting server's options.numOutputBusChannels to %", this.class.name, sf.numChannels).postln;
-				server.options.numOutputBusChannels_(sf.numChannels);
+		{
+			sf.openRead(path);
+			cond = Condition.new;
+			if(autoBootServer, {
+				if(server.options.numOutputBusChannels < sf.numChannels, {
+					if(server.serverRunning.not && autoSetOutputChannels, { //if server is not running, set the number of output channels
+						format("%: setting server's options.numOutputBusChannels to %", this.class.name, sf.numChannels).postln;
+						server.options.numOutputBusChannels_(sf.numChannels);
 
+					}, {
+						format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
+					});
+				});
+				if(server.serverRunning.not && server.options.sampleRate.isNil && autoSetSampleRate, { //also set the samplerate if server is not running
+					//and sampleRate too rate too
+					format("%: setting server's options.sampleRate to %", this.class.name, sf.sampleRate).postln;
+					server.options.sampleRate_(sf.sampleRate);
+				});
+				server.waitForBoot({
+					this.buildSD;
+				});
 			}, {
-				format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
+				this.buildSD;
 			});
-		});
-		if(server.serverRunning.not && server.options.sampleRate.isNil && autoSetSampleRate, { //also set the samplerate if server is not running
-			//and sampleRate too rate too
-			format("%: setting server's options.sampleRate to %", this.class.name, sf.sampleRate).postln;
-			server.options.sampleRate_(sf.sampleRate);
-		});
-		server.waitForBoot({
-			this.buildSD;
-		});
-		sf.close;
-		isPlaying = false;
-		wasPlaying = false;
-		startTime = 0.0;
-		this.changed(\loaded);
+			sf.close;
+			isPlaying = false;
+			wasPlaying = false;
+			startTime = 0.0;
+			this.changed(\loaded);
+		}.try({"Soundfile could not be opened".warn});
 	}
 
 	buildSD {
@@ -153,7 +159,7 @@ SFPlayer {
 
 	play {arg bufsize, addAction, target, rate;
 		// format("startTime in play: %", startTime).postln;
-		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil).if({
+		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil and: server.serverRunning).if({
 			bufsize !? {bufsizeVar = bufsize};
 			addAction !? {addActionVar = addAction};
 			target !? {targetVar = target};
@@ -289,9 +295,9 @@ SFPlayer {
 		// })
 	}
 
-	gui {arg argBounds, doneAction, parent;
+	gui {arg argBounds, doneAction, onCloseAction, parent;
 		if(view.isNil, {
-			view = SFPlayerView(this, argBounds, doneAction, parent)
+			view = SFPlayerView(this, argBounds, doneAction, {onCloseAction.();  view = nil}, parent)
 		}, {
 			view.front;
 		});
@@ -478,7 +484,7 @@ SFPlayerSkin {
 
 SFPlayerView {
 	var <player;
-	var <bounds, <parent, <doneAction, <skin, <>stopPlayerOnClose;
+	var <bounds, <parent, <doneAction, <onCloseAction, <skin, <>stopPlayerOnClose;
 	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
@@ -492,8 +498,8 @@ SFPlayerView {
 	var isSelectingNewStartTime = false; //changes to true when setting soundfileview's cursor; used to prevent updating then
 	var <>requireShiftSpaceForPause = false;
 
-	*new {arg player, bounds, doneAction, parent, skin, stopPlayerOnClose = true;
-		^super.newCopyArgs(player, bounds, parent, doneAction, skin, stopPlayerOnClose).makeGui;
+	*new {arg player, bounds, doneAction, onCloseAction, parent, skin, stopPlayerOnClose = true;
+		^super.newCopyArgs(player, bounds, parent, doneAction, onCloseAction, skin, stopPlayerOnClose).makeGui;
 	}
 
 	makeGui {
@@ -504,7 +510,13 @@ SFPlayerView {
 		ampSpec = [-90, 12].asSpec;
 		// bounds = argBounds ?? {Rect(200, 200, 980, 600)};
 		// bounds ?? {bounds = Rect(200, 200, 980, 600)};
-		bounds ?? {bounds = Rect.aboutPoint(Window.screenBounds.center, 490, 300)};
+		bounds ?? {
+			if(parent.notNil, {
+				bounds = 980@600;
+			}, {
+				bounds = Rect.aboutPoint(Window.screenBounds.center, 490, 300)
+			});
+		};
 		parent.isNil.if({
 			window = Window("", bounds);
 			view = window.view;
@@ -566,7 +578,9 @@ SFPlayerView {
 		timeGrid.font_(Font("Arial", 10));
 		timeGrid.gridColors_([skin.string, nil]);
 		view.onClose_({
-			stopPlayerOnClose.if({player.isPlaying.if({player.stop})}); player.removeDependant(this)
+			stopPlayerOnClose.if({player.isPlaying.if({player.stop})});
+			player.removeDependant(this);
+			onCloseAction.();
 		});
 		scrollAction = {arg view; //called by soundfileview, as well as range slider
 			var scrollRatio = view.viewFrames/ player.sf.numFrames;
@@ -1246,16 +1260,18 @@ SFPlayerView {
 
 	loadSF {
 		if(player.sf.notNil, {
-			timeGrid.horzGrid_(ControlSpec(0, player.sf.duration, units: \s).grid);
-			gridView.refresh;
+			if(player.path.notNil, {
+				timeGrid.horzGrid_(ControlSpec(0, player.sf.duration, units: \s).grid);
+				gridView.refresh;
 
-			sfView.soundfile_(player.sf);
-			sfView.readWithTask(0, player.sf.numFrames, doneAction: {doneAction.value});
-			sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
+				sfView.soundfile_(player.sf);
+				sfView.readWithTask(0, player.sf.numFrames, doneAction: {doneAction.value});
+				sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
 
-			window !? {window.name_(player.path.basename)};
-			if(player.sf.duration >=3600, {showHours = true}, {showHours = false});
-			this.setTimeString(player.startTime);
+				window !? {window.name_(player.path.basename)};
+				if(player.sf.duration >=3600, {showHours = true}, {showHours = false});
+				this.setTimeString(player.startTime);
+			});
 		})
 	}
 
