@@ -1,5 +1,5 @@
 SFPlayer {
-	var <path, <outbus, <server, <autoShowOpenDialog, <autoBootServer, <>autoSetSampleRate, <>autoSetOutputChannels;
+	var <path, <outbus, <server, <autoShowOpenDialog, <>autoBootServer, <>autoSetSampleRate, <>autoSetOutputChannels;
 	var <buffer, <sf, cond, <curSynth, <synthName;
 	var clock, <skin;
 	var <cues, offset, lastStart;
@@ -37,10 +37,19 @@ SFPlayer {
 		});
 	}
 
+	path_ {arg pathArg;
+		path = pathArg;
+		this.runSetup;
+		this.reset;
+	}
+
+	load {arg pathArg;
+		this.path_(pathArg);
+	}
+
 	loadFromOpenPanel {
 		Dialog.openPanel({arg pathArg;
-			path = pathArg;
-			this.runSetup;
+			this.path_(pathArg);
 		})
 	}
 
@@ -1091,7 +1100,6 @@ SFPlayerView {
 							.canFocus_(false)
 							.action_({
 								player.loadFromOpenPanel;
-								player.reset;
 							}),
 							Button.new()
 							.states_([
