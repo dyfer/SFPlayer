@@ -52,7 +52,7 @@ If code::true::, the cursor in the GUI and other dependants will be reset to the
 
 METHOD:: pause
 Stop playing. code::startTime:: is updated to the current playback position.
-note::If code::pause:: is called when the player is stopped, it will preload the playback buffer and wait for the start of playback. This allows starting playback without additional delay for large files or when multiple players are synchronized together::
+note::If code::pause:: is called when the player is stopped, it will preload the playback buffer and wait for the start of playback. This allows starting playback without additional delay on slower storage or when multiple players are synchronized together::
 
 METHOD:: reset
 Updates the player to the initial state (resets playback position, amp, etc.)
@@ -79,6 +79,6 @@ p.play;
 p.stop;
 p.gui;
 
-// opens gui after choosing the file
+// shows open file dialog and opens the gui
 p = SFPlayer.new.gui;
 ::
