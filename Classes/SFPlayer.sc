@@ -31,7 +31,7 @@ SFPlayer {
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
 		(path.isNil && autoShowOpenDialog).if({
-			this.loadFromOpenPanel;
+			this.load;
 		}, {
 			this.runSetup;
 		});
@@ -44,11 +44,11 @@ SFPlayer {
 	}
 
 	load {arg pathArg;
-		this.path_(pathArg);
-	}
-
-	loadFromOpenPanel {
-		Dialog.openPanel({arg pathArg;
+		if(pathArg.isNil, {
+			Dialog.openPanel({arg pathArg;
+				this.path_(pathArg);
+			});
+		}, {
 			this.path_(pathArg);
 		})
 	}
@@ -1099,7 +1099,7 @@ SFPlayerView {
 							])
 							.canFocus_(false)
 							.action_({
-								player.loadFromOpenPanel;
+								player.load;
 							}),
 							Button.new()
 							.states_([
