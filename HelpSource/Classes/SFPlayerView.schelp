@@ -6,6 +6,16 @@ related:: Classes/SFPlayer
 DESCRIPTION::
 A GUI for the link::Classes/SFPlayer::.
 
+Keyboard shortcuts:
+table::
+## strong::function:: || strong::key:: || strong::notes::
+## start/pause || spacebar || if link::#-requireShiftSpaceForPause:: is code::true::, then shift-spacebar is required to pause
+## stop || s || cursor goes back to the last start position
+## pause || p || also works when stopped - useful for cueing multiple linked players
+## go to beginning || esc || active when player is paused/stopped
+## go to previous/next cue || left/right arrow || works only when cues are added/loaded
+::
+
 
 image::../images/SFPlayerView.png::
 
