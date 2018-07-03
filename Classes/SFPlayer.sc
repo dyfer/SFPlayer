@@ -786,15 +786,28 @@ SFPlayerView {
 					),
 					nil,
 					VLayout(
-						advancedButton = Button()
-						.states_([
-							["Advanced\noptions", skin.string, skin.background],
-							["Advanced\noptions", skin.background, skin.string]
-						])
-						.canFocus_(false)
-						.action_({arg view;
-							bottomView.visible_(view.value.asBoolean);
-						})
+						HLayout(
+							advancedButton = Button()
+							.states_([
+								["Advanced\noptions", skin.string, skin.background],
+								["Advanced\noptions", skin.background, skin.string]
+							])
+							.canFocus_(false)
+							.action_({arg view;
+								bottomView.visible_(view.value.asBoolean);
+							}),
+							VLayout(
+								Button()
+								.states_([["?", skin.string, skin.background]])
+								.canFocus_(false)
+								.action_({arg view;
+									SFPlayerView.openHelpFile;
+								})
+								.maxWidth_(20)
+								,
+								nil
+							)
+						)
 						,
 						nil,
 						Button.new()
