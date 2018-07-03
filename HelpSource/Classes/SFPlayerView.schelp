@@ -15,6 +15,7 @@ table::
 ## go to beginning || esc || active when player is paused/stopped
 ## go to previous/next cue || left/right arrow || works only when cues are added/loaded
 ::
+Use mouse wheel/vertical two-finger drag to zoom in/out, and shift + mouse wheel or horizontal two-finger drag to scroll.
 
 
 image::../images/SFPlayerView.png::

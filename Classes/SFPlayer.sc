@@ -506,13 +506,13 @@ SFPlayerView {
 	var <>updateTime = 0.1;
 	var isSelectingNewStartTime = false; //changes to true when setting soundfileview's cursor; used to prevent updating then
 	var <>requireShiftSpaceForPause = false;
+	var <>autoScroll = true;
 
 	*new {arg player, bounds, doneAction, onCloseAction, parent, skin, stopPlayerOnClose = true;
 		^super.newCopyArgs(player, bounds, parent, doneAction, onCloseAction, skin, stopPlayerOnClose).makeGui;
 	}
 
 	makeGui {
-		var scrollAction;
 		skin ?? {skin = SFPlayerSkin.default};
 
 		// format("player: %, its amp: %", player, player.amp).postln;
@@ -591,17 +591,6 @@ SFPlayerView {
 			player.removeDependant(this);
 			onCloseAction.();
 		});
-		scrollAction = {arg view; //called by soundfileview, as well as range slider
-			var scrollRatio = view.viewFrames/ player.sf.numFrames;
-			var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * player.sf.duration;
-			var end = start + (scrollRatio * player.sf.duration);
-			var grid = timeGrid.x.grid;
-			grid.spec.minval_(start);
-			grid.spec.maxval_(end);
-			timeGrid.horzGrid_(grid);
-			gridView.refresh;
-			cuesView.refresh;
-		};
 		view.layout_(
 			VLayout(
 				HLayout(
@@ -825,6 +814,7 @@ SFPlayerView {
 						.background_(skin.background)
 						.knobColor_(Color.black)
 						.canFocus_(false)
+						// .maxHeight_(16)
 						.action_({arg view;
 							var divisor, rangeStart;
 							rangeStart = view.lo;
@@ -832,11 +822,10 @@ SFPlayerView {
 							if(divisor < 0.0001) {
 								rangeStart = 0;
 								divisor = 1;
-
 							};
 							sfView.xZoom_(view.range * player.sf.duration)
 							.scrollTo(rangeStart / divisor);
-							scrollAction.(sfView);
+							this.prScrollAction(false);
 						}),
 						[
 							StackLayout(
@@ -854,8 +843,8 @@ SFPlayerView {
 									// "mousedown fires".postln;
 									if(button == 0, {
 										isSelectingNewStartTime = true;
-										0; //return non-bool to maintain view's response! see "key and mouse even processing" in help...
 									});
+									0; //return non-bool to maintain view's response! see "key and mouse even processing" in help...
 								})
 								.mouseUpAction_({arg view, x, y, mod, button, cCount;
 									// "mouseup fires".postln;
@@ -866,13 +855,39 @@ SFPlayerView {
 									0;
 								})
 								.mouseMoveAction_({arg view;
-									var rangeSize, rangeStart;
-									//for zoom slider
-									rangeSize = view.xZoom / player.sf.duration;
-									rangeStart = view.scrollPos * (1 - rangeSize);
-									zoomSlider.lo_(rangeStart).range_(rangeSize);
-									//
-									scrollAction.(view);
+									this.prScrollAction(true);
+								})
+								.mouseWheelAction_({arg view, x, y, modifiers, xDelta, yDelta;
+									var curSecs, newSecs, oldPos;
+									var divisor, rangeStart, rangeSize, oldRangeSize;
+									var scrollDiff;
+									// "[x, y, modifiers, xDelta, yDelta]: ".post; [x, y, modifiers, xDelta, yDelta].postln;
+									//modifiers (macos)
+									//131072 shift
+									//1048576 cmd
+									//1179648 cmd+shift
+									//524288 alt
+									//1572864 cmd+alt
+									//1310720 cmd+ctrl
+
+									curSecs = view.xZoom;
+									oldRangeSize = curSecs / player.sf.duration;
+									if(yDelta != 0, {
+										rangeSize = oldRangeSize + (oldRangeSize * yDelta * 0.01);
+										rangeSize = rangeSize.min(1);
+										rangeStart = view.scrollPos * (1 - rangeSize);
+										view.xZoom_(rangeSize * player.sf.duration);
+										view.scroll(yDelta * -0.01 * x.linlin(view.bounds.width * 0, view.bounds.width * 1, 0, 1.01));
+									}, {
+										rangeSize = oldRangeSize;
+										rangeStart = view.scrollPos * (1 - rangeSize);
+									});
+
+									if(xDelta != 0, {
+										view.scroll(xDelta * -0.01);
+									});
+
+									this.prScrollAction(true);
 								})
 								.timeCursorPosition_(0),
 							).mode_(\stackAll),
@@ -1155,6 +1170,26 @@ SFPlayerView {
 		this.loadSF;
 	}
 
+	prScrollAction {arg updateSlider = false; //called by soundfileview, as well as range slider
+		var view = sfView;
+		var scrollRatio = view.viewFrames/ player.sf.numFrames;
+		var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * player.sf.duration;
+		var end = start + (scrollRatio * player.sf.duration);
+		var grid = timeGrid.x.grid;
+		grid.spec.minval_(start);
+		grid.spec.maxval_(end);
+		timeGrid.horzGrid_(grid);
+		gridView.refresh;
+		cuesView.refresh;
+		if(updateSlider, {
+			var rangeSize, rangeStart;
+			//for zoom slider
+			rangeSize = view.xZoom / player.sf.duration;
+			rangeStart = view.scrollPos * (1 - rangeSize);
+			zoomSlider.lo_(rangeStart).range_(rangeSize);
+		});
+	}
+
 	advanced {
 		^bottomView.visible;
 	}
@@ -1191,7 +1226,16 @@ SFPlayerView {
 			}, {
 				var curTime;
 				curTime = player.curTime;
-				if(isSelectingNewStartTime.not, {sfView.timeCursorPosition_(curTime * player.sf.sampleRate)});
+				if(isSelectingNewStartTime.not, {
+					sfView.timeCursorPosition_(curTime * player.sf.sampleRate);
+					// "(sfView.scrollPos * player.sf.duration - xZoom: ".post; (sfView.scrollPos * player.sf.duration + sfView.xZoom).postln;
+					if(autoScroll, {
+						if((curTime < (sfView.scrollPos * (player.sf.duration - sfView.xZoom))) || (curTime > ((sfView.scrollPos * (player.sf.duration - sfView.xZoom)) + sfView.xZoom)), {
+							sfView.scrollTo(curTime / (player.sf.duration - sfView.xZoom));
+							this.prScrollAction(true);
+						});
+					});
+				});
 				// timeString.string_(curTime.round(0.01).asTimeString[3..10]);
 				this.setTimeString(curTime);
 				updateTime.wait;
