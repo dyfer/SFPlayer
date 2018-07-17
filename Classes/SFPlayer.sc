@@ -26,7 +26,7 @@ SFPlayer {
 		// targetVar = 1;
 		this.target_(1);
 		outbus ?? {this.outbus_(0)};
-		bufsizeVar = 65536 * 8;
+		bufsizeVar = 2.pow(17).asInt;
 		amp = 1;
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
@@ -107,12 +107,12 @@ SFPlayer {
 		if(multiplyBufsizeByNumChannels, {
 			localBufSize = this.bufsize * sf.numChannels;
 		}, {
-			localBufSize = this.bufSize;
+			localBufSize = this.bufsize;
 		});
 		// bufsize = bufsize * sf.numChannels; //should I multiplet
 		// server.sendMsg(\b_alloc, bufnum = server.bufferAllocator.alloc, bufsize, sf.numChannels,
 		// [\b_read, bufnum, path, startTime * sf.sampleRate, bufsize, 0, 1]);
-		buffer = Buffer.cueSoundFile(server, path, sTime * sf.sampleRate, sf.numChannels, localBufSize, completionMessage);
+		buffer = Buffer.cueSoundFile(server, path, (sTime * sf.sampleRate).asInt, sf.numChannels, localBufSize, completionMessage);
 	}
 
 	freeBuffer {arg when;
