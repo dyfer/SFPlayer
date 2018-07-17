@@ -337,17 +337,19 @@ SFPlayer {
 				time = startTime;
 			})
 		});
-		(time < sf.duration).if({
-			//			(cues.notNil and: {cues[key].notNil}).if({
-			//				this.removeCue(key, false, false);
-			//			});
-			cues = cues.add([key, time]);
-		}, {
-			"You tried to add a cue past the end of the soundfile".warn;
-		});
-		sort.if({this.sortCues});
-		// redraw.if({this.drawCues}); //move to update
-		this.changed(\cues, cues);
+		key.notNil.if({
+			(time < sf.duration).if({
+				//			(cues.notNil and: {cues[key].notNil}).if({
+				//				this.removeCue(key, false, false);
+				//			});
+				cues = cues.add([key, time]);
+			}, {
+				"You tried to add a cue past the end of the soundfile".warn;
+			});
+			sort.if({this.sortCues});
+			// redraw.if({this.drawCues}); //move to update
+			this.changed(\cues, cues);
+		})
 	}
 
 	removeCue {arg key, sort = true, redraw = true;
@@ -985,26 +987,41 @@ SFPlayerView {
 								.background_(skin.background)
 								.action_({arg view;
 									var vals;
-									vals = view.string.interpret;
+									try{vals = view.string.interpret};
+									vals ?? {
+										(view.string.stripWhiteSpace.size > 0).if({
+											vals = view.string.split($,).collect({|key, inc|
+												inc.even.if({
+													key.stripWhiteSpace.asSymbol;
+												}, {
+													var ret;
+													protect{ret = key.interpret} {ret = ret ? key};
+													ret;
+												})
+											})
+										});
+									};
 									vals.isKindOf(Symbol).if({
 										vals = [vals, nil]
 									}); //take time from the cursor
-									vals = vals.collect({arg val, inc; val.isKindOf(String).if({val.asSecs}, {val})}); //convert time string to seconds
-									vals.isKindOf(Array).if({
-										vals = vals.flat.clump(2);
-									}, {
-										vals = vals.asArray.flat.clump(2)
-									});
-									vals[0].isKindOf(Array).if({
-										vals.do({arg thisPair;
-											player.addCue(thisPair[0], thisPair[1], false)
+									if(vals.isKindOf(Collection), { //by now it needs to be...
+										vals = vals.collect({arg val, inc; val.isKindOf(String).if({val.asSecs}, {val})}); //convert time string to seconds
+										vals.isKindOf(Array).if({
+											vals = vals.flat.clump(2);
+										}, {
+											vals = vals.asArray.flat.clump(2)
 										});
-										player.sortCues;
-									}, {
-										player.addCue(vals[0], vals[1], true)
+										vals[0].isKindOf(Array).if({
+											vals.do({arg thisPair;
+												player.addCue(thisPair[0], thisPair[1], false)
+											});
+											player.sortCues;
+										}, {
+											player.addCue(vals[0], vals[1], true)
+										});
+										view.focus(false);
+										view.string_("");
 									});
-									view.focus(false);
-									view.string_("");
 								}),
 								Button()
 								.states_([
@@ -1029,7 +1046,8 @@ SFPlayerView {
 								.background_(skin.background)
 								.action_({arg view;
 									var vals;
-									vals = view.string.interpret;
+									try{vals = view.string.interpret};
+									vals ?? {vals = view.string.split($,).collect({|key| key.asSymbol})};
 									vals.isKindOf(Array).if({
 										vals = vals.flat;
 									}, {
