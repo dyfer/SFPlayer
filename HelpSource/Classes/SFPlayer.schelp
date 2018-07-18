@@ -49,7 +49,7 @@ ARGUMENT:: argBounds
 Bounds of the gui. If code::nil::, a default size will be used.
 
 ARGUMENT:: doneAction
-Action to be performed after opening the gui.
+Action to be performed after opening the gui and loading the soundfile into the SoundFileView.
 
 ARGUMENT:: onCloseAction
 Action to be performed after closing the gui.
