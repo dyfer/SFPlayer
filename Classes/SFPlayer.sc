@@ -438,6 +438,18 @@ SFPlayer {
 		}.defer(0.11) //fixme: do we need defer here?
 	}
 
+	free {
+		this.stop;
+		//also clean up resources in the future here
+		this.view !? {
+			{this.view.window.notNil.if({this.view.window.close}, {this.view.view.close})}.defer;
+		}
+	}
+
+	close {
+		this.free;
+	}
+
 	update {arg who, what ...args;
 		var value = args[0];
 		// args[0] is the value
@@ -1229,7 +1241,7 @@ SFPlayerView {
 			^addActionArg;
 		}, {
 			//assume name
-			^Node.addActions.select({|key, val| val.postln.asString.containsi(addActionArg.asString)}).asArray[0];
+			^Node.addActions.select({|key, val| val.asString.containsi(addActionArg.asString)}).asArray[0];
 		})
 	}
 
