@@ -181,6 +181,7 @@ SFPlayer {
 					lastStart = startTime;
 					// clock.sched(sf.duration - startTime + 0.1, {this.stop});
 					if(bufferPreloaded.not && isPlaying, {
+						this.changed(\isPaused, true); //force preloading buffer in dependants, for synchronization
 						this.loadBuffer(startTime);
 						// bufferPreloaded = false;//not sure if needed here
 					}, {
