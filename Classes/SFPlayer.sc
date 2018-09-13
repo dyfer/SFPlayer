@@ -204,7 +204,7 @@ SFPlayer {
 						isPaused = false;
 						isStarting = false;
 						this.changed(\isPlaying, this.isPlaying);
-						this.changed(\isPaused, isPaused);
+						this.changed(\isPaused, isPaused); //should this be moved before \isPlaying?
 					});
 				})
 			}, {
@@ -398,6 +398,15 @@ SFPlayer {
 		}, {
 			cues.writeArchive(path)
 		})
+	}
+
+	setCues {arg newCues, forSure = false;
+		if(forSure, {
+			cues = newCues;
+			this.changed(\cues, cues);
+		}, {
+			"you need to confirm overriding cues by setting second argument to true".warn;
+		});
 	}
 
 	playFromCue {arg key, idx;
@@ -1199,6 +1208,7 @@ SFPlayerView {
 		// window.front; //
 		player.addDependant(this);
 		this.loadSF;
+		player.cues !? {this.drawCues};
 	}
 
 	prScrollAction {arg updateSlider = false; //called by soundfileview, as well as range slider
