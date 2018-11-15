@@ -24,7 +24,7 @@ SFPlayer {
 		this.addAction_(0);
 		// addActionVar = 0;
 		// targetVar = 1;
-		this.target_(1);
+		this.target_(server.defaultGroup);
 		outbus ?? {this.outbus_(0)};
 		bufsizeVar = 2.pow(17).asInt;
 		amp = 1;
