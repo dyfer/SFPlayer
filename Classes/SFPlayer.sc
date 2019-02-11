@@ -521,7 +521,7 @@ SFPlayerView {
 	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
-	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine;
+	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine, <filenameString;
 	var <skin;
 	// var tempBounds, tempAction;
 	// var curTime; // here vs player???
@@ -618,32 +618,45 @@ SFPlayerView {
 		view.layout_(
 			VLayout(
 				HLayout(
-					HLayout(
-						nil,
-						timeString = StaticText()
-						.font_(Font("Arial", 72))
+					VLayout(
+						filenameString = StaticText()
+						.font_(Font("Arial", 14))
+						.background_(skin.background)
 						.stringColor_(skin.string)
-						.align_(\right)
-						.fixedHeight_(80)
-						// .string_(player.startTime.asTimeString[3..10])
-						// .string_(0.asTimeString[3..7])
-						// .minWidth_(200)
-						.fixedSize_(280@80)
+						.align_(\center)
+						.visible_(parent.notNil)
 						,
-						VLayout(
-							24,
-							timeStringSm = StaticText()
-							.font_(Font("Arial", 36))
+						View()
+						.fixedHeight_(1)
+						.background_(skin.string)
+						.visible_(parent.notNil), //horizontal line
+						HLayout(
+							nil,
+							timeString = StaticText()
+							.font_(Font("Arial", 72))
 							.stringColor_(skin.string)
-							.canFocus_(true)
+							.align_(\right)
+							.fixedHeight_(80)
 							// .string_(player.startTime.asTimeString[3..10])
-							// .string_("00")
-							// .fixedHeight_(44)
-							// .fixedWidth_(60)
-							.fixedSize_(60@40)
+							// .string_(0.asTimeString[3..7])
+							// .minWidth_(200)
+							.fixedSize_(280@80)
 							,
-						)
-					),
+							VLayout(
+								24,
+								timeStringSm = StaticText()
+								.font_(Font("Arial", 36))
+								.stringColor_(skin.string)
+								.canFocus_(true)
+								// .string_(player.startTime.asTimeString[3..10])
+								// .string_("00")
+								// .fixedHeight_(44)
+								// .fixedWidth_(60)
+								.fixedSize_(60@40)
+								,
+							)
+						),
+					).margins_([0, 0, 0, 0]).spacing_(2),
 					VLayout(
 						HLayout(
 							Button.new()
@@ -1375,6 +1388,7 @@ SFPlayerView {
 				sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
 
 				window !? {window.name_(player.path.basename)};
+				parent !? {filenameString.string_(player.path.basename)};
 				if(player.sf.duration >=3600, {showHours = true}, {showHours = false});
 				this.setTimeString(player.startTime);
 			});
