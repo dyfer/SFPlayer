@@ -73,8 +73,12 @@ SFPlayer {
 					format("%: setting server's options.sampleRate to %", this.class.name, sf.sampleRate).postln;
 					server.options.sampleRate_(sf.sampleRate);
 				});
-				server.waitForBoot({
+				if(server.serverRunning, {
 					this.buildSD;
+				}, {
+					server.waitForBoot({
+						this.buildSD;
+					});
 				});
 			}, {
 				this.buildSD;
