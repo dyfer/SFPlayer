@@ -33,7 +33,7 @@ SFPlayer {
 		(path.isNil && autoShowOpenDialog).if({
 			this.load;
 		}, {
-			this.runSetup;
+			path !? {this.runSetup};
 		});
 	}
 
