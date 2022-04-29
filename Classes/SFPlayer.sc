@@ -65,7 +65,9 @@ SFPlayer {
 						server.options.numOutputBusChannels_(sf.numChannels);
 
 					}, {
-						format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
+						if(outbus < server.options.numOutputBusChannels, {
+							format("%: server's options.numOutputBusChannels (%) is lower than soundfile's numChannels (%)", this.class.name, server.options.numOutputBusChannels, sf.numChannels).warn;
+						});
 					});
 				});
 				if(server.serverRunning.not && server.options.sampleRate.isNil && autoSetSampleRate, { //also set the samplerate if server is not running
