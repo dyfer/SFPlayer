@@ -10,6 +10,7 @@ SFPlayer {
 	var <>switchTargetWhilePlaying = true;
 	var <view;
 	var <attRelTime = 0.02;
+	var <>defaultOpenPath;
 	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
 
 	*new {arg path, outbus, server, skin, autoShowOpenDialog = true, autoBootServer = true, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
@@ -47,7 +48,7 @@ SFPlayer {
 		if(pathArg.isNil, {
 			Dialog.openPanel({arg pathArg;
 				this.path_(pathArg);
-			});
+			}, path: defaultOpenPath);
 		}, {
 			this.path_(pathArg);
 		})
