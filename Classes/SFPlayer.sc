@@ -38,7 +38,7 @@ SFPlayer {
 	path_ {arg pathArg;
 		path = pathArg;
 		this.runSetup;
-		this.reset;
+		// this.reset; // don't automatically reset
 	}
 
 	load {arg pathArg;
