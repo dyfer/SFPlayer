@@ -21,14 +21,11 @@ SFPlayer {
 		skin = argSkin;// ?? {SFPlayerSkin.default};
 		server = server ?? Server.default;
 		this.rate_(1);
-		// rateVar = 1;
 		this.addAction_(0);
-		// addActionVar = 0;
-		// targetVar = 1;
 		this.target_(server.defaultGroup);
 		outbus ?? {this.outbus_(0)};
 		bufsizeVar = 2.pow(17).asInteger;
-		amp = 1;
+		this.amp_(1);
 		// server.serverRunning.not({server.boot}); //this was not working (missing .if); we have waitForBoot in runSetup anyway
 		offset = 0;
 		(path.isNil && autoShowOpenDialog).if({
