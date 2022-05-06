@@ -771,7 +771,7 @@ SFPlayerView {
 						[
 							[
 								ampSlider = Slider()
-								.value_(ampSpec.unmap(player.amp))
+								.value_(ampSpec.unmap(player.amp.ampdb))
 								.canFocus_(false)
 								.orientation_(\horizontal)
 								.maxHeight_(20)
