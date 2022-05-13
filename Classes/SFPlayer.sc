@@ -1012,6 +1012,7 @@ SFPlayerView {
 							})
 							.refresh
 						}.(),
+						2,
 						[
 							StackLayout(
 								cuesView = UserView().acceptsMouse_(false),
