@@ -94,14 +94,14 @@ SFPlayer {
 
 	buildSD {
 		synthName = "SFPlayer"++sf.numChannels;
-		SynthDef(synthName, {arg gate = 1, buffer, amp = 1, rate = 1, outbus;
+		SynthDef(synthName, {arg gate = 1, buffer, amp = 1, rate = 1, attRelArg, outbus;
 			var diskin;
 			diskin = VDiskIn.ar(sf.numChannels, buffer, (BufSampleRate.kr(buffer) / SampleRate.ir) * rate);
 			((sf.numChannels == 1) && duplicateSingleChannel).if({
 				diskin = diskin.dup
 			});
 			Out.ar(outbus, diskin *
-				EnvGen.kr(Env([0, 1, 0], [attRelTime, attRelTime], \sin, 1), gate, doneAction: 2) *
+				EnvGen.kr(Env([0, 1, 0], [attRelArg, attRelArg], \welch, 1), gate, doneAction: 2) *
 				Lag.kr(amp, 0.1))
 		}).add;
 	}
@@ -171,6 +171,11 @@ SFPlayer {
 		this.changed(\rate, this.rate);
 	}
 
+	attRelTime_ {arg val;
+		attRelTime = val;
+		curSynth !? {curSynth.set(\attRelArg, attRelTime)};
+	}
+
 	play {arg bufsize, addAction, target, rate;
 		// format("startTime in play: %", startTime).postln;
 		(isPlaying.not and: {startTime < sf.duration} and: synthName.notNil and: server.serverRunning).if({
@@ -218,7 +223,7 @@ SFPlayer {
 						// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
 						// curNode = server.nodeAllocator.alloc(1), addAction, target,
 						// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
-						curSynth = Synth(synthName, [\buffer, buffer, \amp, amp, \outbus, outbus, \rate, rateVar], targetVar, addActionVar);
+						curSynth = Synth(synthName, [\buffer, buffer, \amp, amp, \outbus, outbus, \rate, rateVar, \attRelArg, attRelTime], targetVar, addActionVar);
 						// curNode = curSynth.nodeID;
 						isPaused = false;
 						isStarting = false;
@@ -263,7 +268,7 @@ SFPlayer {
 			bufferPreloaded = false;
 			this.changed(\isPlaying, isPlaying, updateStart);
 			this.changed(\isPaused, isPaused);
-			this.freeBuffer(0.2);
+			this.freeBuffer(attRelTime + 0.01);
 			// SystemClock.sched(0.2, {
 			// 	server.sendBundle(nil, [\b_close, oldbufnum], [\b_free, oldbufnum]);
 			// 	server.bufferAllocator.free(oldbufnum);
