@@ -823,22 +823,29 @@ SFPlayerView {
 							StaticText()
 							.string_("Amplitude (in dB)")
 							.stringColor_( skin.string),
-
-							ampNumber = NumberBox()
-							.value_(player.amp.ampdb)
-							.background_(skin.background)
-							.normalColor_( skin.string)
-							.action_({arg view;
-								player.amp_(view.value.dbamp, \number);
-								// ampSlider.value_(ampSpec.unmap(me.value);
-								// view.focus(true));
-								view.focus(false);
-							}).maxWidth_(50),
+							{
+								ampNumber = NumberBox()
+								.background_(skin.background)
+								.normalColor_( skin.string)
+								.action_({arg view;
+									player.amp_(view.value.dbamp, \number);
+									// ampSlider.value_(ampSpec.unmap(me.value);
+									// view.focus(true));
+									view.focus(false);
+								}).maxWidth_(50);
+								if(player.amp.isKindOf(Symbol)) {
+									ampNumber.string_(player.amp)
+								} {
+									ampNumber.value_(player.amp.ampdb)
+								};
+								ampNumber
+							}.(),
 						],
 						[
 							[
 								ampSlider = Slider()
-								.value_(ampSpec.unmap(player.amp.ampdb))
+								.value_(player.amp.isKindOf(SimpleNumber).if({ampSpec.unmap(player.amp.ampdb)}))
+								.enabled_(player.amp.isKindOf(SimpleNumber))
 								.canFocus_(false)
 								.orientation_(\horizontal)
 								.maxHeight_(20)
