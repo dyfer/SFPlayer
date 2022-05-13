@@ -4,6 +4,7 @@ SFPlayer {
 	var clock, <skin;
 	var <cues, offset, lastStart;
 	var <amp, <isPlaying = false, <isPaused = false, <bufferPreloaded = false, <isStopping = false, <isStarting = false, wasPlaying, <startTime, lastTimeForCurrentRate = 0;
+	var <loop = false, <loopBeginning, <loopEnd;
 	// var <openFilePending = false, <openGUIafterLoading = false;
 	var <>duplicateSingleChannel = true;
 	var rateVar, addActionVar, targetVar, bufsizeVar, <>multiplyBufsizeByNumChannels = true;
@@ -11,7 +12,7 @@ SFPlayer {
 	var <view;
 	var <attRelTime = 0.02;
 	var <>defaultOpenPath;
-	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
+	var <>followAddAction = true, <>followTarget = true, <>followAmp = true, <>followOutbus = true, <>followRate = true, <>followPlayStopPause = true, <>followStartTime = true, <>followLoop = true; //set which parameters will be updated when this sfplayer is registered as a dependant of another one
 
 	*new {arg path, outbus, server, skin, autoShowOpenDialog = true, autoBootServer = true, autoSetSampleRate = true, autoSetOutputChannels = true; /*autoSetSampleRate and autoSetOutputChannels are only exectuded it the server is not booted*/
 		^super.newCopyArgs(path, outbus, server, autoShowOpenDialog, autoBootServer, autoSetSampleRate, autoSetOutputChannels).initSFPlayer(skin);
@@ -199,7 +200,21 @@ SFPlayer {
 					}, {
 						// "starting synth".postln;
 						clock = TempoClock(this.rate, startTime);
-						clock.schedAbs(sf.duration + (0.2), {this.stop}); //should I move this to nodewatcher?
+						// clock.schedAbs(sf.duration + (0.2), {this.stop}); //should I move this to nodewatcher?
+						this.loopEnd !? {
+							clock.schedAbs(this.loopEnd, {
+								if(this.loop, {
+									this.startTime_(this.loopBeginning ? 0); // or loop beginning or lastStart?
+								})
+							});
+						};
+						clock.schedAbs(sf.duration, { // sf.duration or loop end...?
+							if(this.loop, {
+								this.startTime_(this.loopBeginning ? 0); // or loop beginning or lastStart?
+							}, {
+								this.stop;
+							})
+						});
 						// server.sendMsg(\s_new, "SFPlayer"++sf.numChannels,
 						// curNode = server.nodeAllocator.alloc(1), addAction, target,
 						// \buffer, bufnum, \amp, amp, \outbus, outbus, \rate, rate);
@@ -307,6 +322,41 @@ SFPlayer {
 		// 	cueOffsetNum.value_(0);
 		// 	offset = 0;
 		// })
+	}
+
+	loop_ {arg val;
+		var oldVal = loop;
+		loop = val.asBoolean;
+		if((oldVal ? false).not && (loop ? false), {
+			(isPlaying || isPaused).if({
+				this.loopEnd !? {
+					clock.schedAbs(this.loopEnd, {
+						if(this.loop, {
+							this.startTime_(this.loopBeginning ? 0); // or loop beginning or lastStart?
+						})
+					});
+				};
+			})
+		});
+		this.changed(\loop, this.loop)
+	}
+
+	loopBeginning_ {arg val;
+		loopBeginning = val;
+		this.changed(\loopBeginning, this.loopBeginning);
+		this.loopEnd !? {this.changed(\loopBeginningEnd, this.loopBeginning, this.loopEnd)};
+	}
+
+	loopEnd_ {arg val;
+		loopEnd = val;
+		this.changed(\loopEnd, this.loopEnd);
+		this.changed(\loopBeginningEnd, this.loopBeginning, this.loopEnd);
+	}
+
+	loopBeginningEnd_ {arg beginning, end;
+		loopBeginning = beginning;
+		loopEnd = end;
+		this.changed(\loopBeginningEnd, this.loopBeginning, this.loopEnd);
 	}
 
 	gui {arg argBounds, doneAction, onCloseAction, parent;
@@ -487,7 +537,10 @@ SFPlayer {
 					})
 				},
 				\isPaused, {if(followPlayStopPause && value, {this.pause})},
-				\startTime, {if(followStartTime, {this.startTime_(value)})}
+				\startTime, {if(followStartTime, {this.startTime_(value)})},
+				\loop, {if(followLoop, {this.loop_(value)})},
+				\loopBeginning, {if(followLoop, {this.loopBeginning_(value)})},
+				\loopEnd, {if(followLoop, {this.loopEnd_(value)})}
 			)
 		})
 	}
@@ -522,7 +575,7 @@ SFPlayerSkin {
 SFPlayerView {
 	var <player;
 	var <bounds, <parent, <doneAction, <onCloseAction, <skin, <>stopPlayerOnClose;
-	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
+	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, loopButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
 	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine, <filenameString;
@@ -693,7 +746,7 @@ SFPlayerView {
 							// 	player.play;
 							// 	false;
 							// })
-							.fixedWidth_(80),
+							.fixedWidth_(90),
 
 							pauseButton = Button.new()
 							.states_([
@@ -715,8 +768,20 @@ SFPlayerView {
 							.states_([["❙◀️", skin.string, skin.background]])
 							.canFocus_(false)
 							.action_({arg button; player.startTime_(0)})
-							.fixedWidth_(50)
+							.fixedWidth_(30)
 							.fixedHeight_(30)
+							,
+							loopButton = Button.new()
+							.states_([
+								["⥁", skin.string, skin.background],
+								["⥁", skin.background, skin.string]
+							])
+							.canFocus_(false)
+							.action_({|bu| player.loop_(bu.value.asBoolean)})
+							.fixedWidth_(30)
+							.fixedHeight_(30)
+							.font_(Font(size: 26))
+							.value_(player.loop.asInteger)
 							,
 							StaticText()
 							// .font_(Font(size: 8))
@@ -892,6 +957,14 @@ SFPlayerView {
 									if(button == 0, {
 										player.startTime_(view.timeCursorPosition / player.sf.sampleRate);
 										isSelectingNewStartTime = false;
+										if(view.selections.first[1] > 0, {
+											player.loopBeginningEnd_(
+												view.selections.first[0] / player.sf.sampleRate,
+												view.selections.first.sum / player.sf.sampleRate
+											);
+										}, {
+											player.loopBeginningEnd_(nil, nil)
+										});
 									});
 									0;
 								})
@@ -1451,6 +1524,15 @@ SFPlayerView {
 						outMenu.focus(false);
 						// cueOffsetNum.value_(0); //not sure we need this?
 						// player.offset = 0;
+					},
+					\loop, {
+						loopButton.value_(value.asInteger);
+					},
+					\loopBeginningEnd, {
+						if(value.notNil && args[1].notNil, {
+							sfView.setSelectionStart(0, value * player.sf.sampleRate);
+							sfView.setSelectionSize(0, (args[1] - value) * player.sf.sampleRate);
+						});
 					},
 					\cues, {
 						this.drawCues

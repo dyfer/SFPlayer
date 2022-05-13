@@ -79,6 +79,20 @@ METHOD:: view
 
 returns:: If the gui was created, this returns an instance of the code::SFPlayerView::.
 
+subsection:: Looping
+
+METHOD:: loop
+Turn looping on/off by setting loop to code::true:: or code::false::.
+
+METHOD:: loopBeginning
+Get/Set loop beginning (in seconds).
+
+METHOD:: loopEnd
+Get/Set loop end (in seconds).
+
+METHOD:: loopBeginningEnd
+Set both beginning and end of the loop (used by the code::SFPlayerView::).
+
 subsection:: Synchronizing multiple players
 
 It is possible to link multiple players together and have them start playback at the same time.
