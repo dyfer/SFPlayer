@@ -578,8 +578,10 @@ SFPlayerView {
 	var <window, <view, <bottomView, <advancedButton, outMenu, playButton, pauseButton, loopButton, ampSlider, ampNumber, rateNumber, targetText, addActionMenu;
 	var cueOffsetNum, cueMenu;
 	var scope;
-	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomSlider, guiRoutine, <filenameString;
+	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomView, <zoomImage, guiRoutine, <filenameString;
 	var <skin;
+	var <zoomLo = 0, <zoomHi = 1; // for overview on top; normalized
+	var zoomHandlePx = 10;
 	// var tempBounds, tempAction;
 	// var curTime; // here vs player???
 	var ampSpec;
@@ -915,24 +917,101 @@ SFPlayerView {
 				).margins_([0, 0, 0, 0]), //end of top section with time, play/stop, amp etc
 				[
 					VLayout(
-						zoomSlider = RangeSlider().orientation_(\horizontal)
-						.lo_(0).range_(1)
-						.background_(skin.background)
-						.knobColor_(Color.black)
-						.canFocus_(false)
-						// .maxHeight_(16)
-						.action_({arg view;
-							var divisor, rangeStart;
-							rangeStart = view.lo;
-							divisor = 1 - view.range;
-							if(divisor < 0.0001) {
-								rangeStart = 0;
-								divisor = 1;
-							};
-							sfView.xZoom_(view.range * player.sf.duration)
-							.scrollTo(rangeStart / divisor);
-							this.prScrollAction(false);
-						}),
+						{
+							var dragOffset, action;
+							zoomView = UserView()
+							.background_(skin.background.lighten(Color.gray(1, 0.1), 0.1))
+							.fixedHeight_(50)
+							.drawingEnabled_(true)
+							.mouseDownAction_({arg view, x, y, modifiers, buttonNumber, clickCount;
+								var zoomLoPx = zoomLo * view.bounds.width;
+								var zoomHiPx = zoomHi * view.bounds.width;
+								if((x >= zoomLoPx) && (x <= zoomHiPx)) {
+									if(x <= (zoomLoPx + zoomHandlePx)) {
+										dragOffset = x - zoomLoPx;
+										// postf("drag offset Lo %\n", dragOffset);
+										action = \lo;
+									} {
+										if(x >= (zoomHiPx - zoomHandlePx)) {
+											dragOffset = x - zoomHiPx;
+											action = \hi;
+										} {
+											dragOffset = [x - zoomLoPx, x - zoomHiPx];
+											// postf("drag offset range %\n", dragOffset);
+											action = \range;
+										}
+									};
+								};
+							})
+							.mouseMoveAction_({arg view, x, y, modifiers, buttonNumber, clickCount;
+								var zoomLoPx = zoomLo * view.bounds.width;
+								var zoomHiPx = zoomHi * view.bounds.width;
+								action.switch(
+									\lo, {
+										zoomLo = ((x - dragOffset) / view.bounds.width).min(zoomHi - (zoomHandlePx / view.bounds.width)).max(0);
+									},
+									\hi, {
+										zoomHi = ((x - dragOffset) / view.bounds.width).max(zoomLo + (zoomHandlePx / view.bounds.width)).min(1);
+									},
+									\range, {
+										// ([x, view.bounds.width] ++ dragOffset).postln;
+										x = x.clip(dragOffset[0], view.bounds.width + dragOffset[1]);
+										zoomLo = ((x - dragOffset[0]) / view.bounds.width).clip(0, zoomHi - ((2 * zoomHandlePx) / view.bounds.width));
+										zoomHi = ((x - dragOffset[1]) / view.bounds.width).clip(zoomLo + ((2 * zoomHandlePx) / view.bounds.width), 1);
+									}
+								);
+
+								// format("zoomLo: %", zoomLo).postln;
+								// format("zoomHi: %", zoomHi).postln;
+
+								// view.refresh; // called from prScrollAction
+
+								sfView.xZoom_((zoomHi - zoomLo) * player.sf.duration)
+								.scrollTo(zoomLo / (1 - (zoomHi - zoomLo)));
+								this.prScrollAction(true);
+
+							})
+							.mouseUpAction_({
+								if(dragOffset.notNil) {
+									// "resetting dragOffset".postln;
+									dragOffset = nil;
+									action = nil
+								}
+							})
+							.drawFunc_({|view|
+								// (non)zoom waveform
+								zoomImage !? {
+									var numCh = player.sf.numChannels;
+									var chHeight = zoomImage.height / numCh;
+									numCh.do({|inc|
+										zoomImage.drawInRect(
+											Rect(0, 0, view.bounds.width, view.bounds.height),
+											Rect(0, chHeight * inc, zoomImage.width, chHeight),
+											\sourceOver,
+											1
+										);
+									});
+								};
+								Pen.color = Color.gray(0, 0.75);
+								Pen.width = 2;
+								// zoom handles
+								Pen.addRect(
+									Rect(zoomLo * view.bounds.width, 0, zoomHandlePx, view.bounds.height)
+								);
+								Pen.addRect(
+									Rect((zoomHi * view.bounds.width) - zoomHandlePx, 0, zoomHandlePx, view.bounds.height)
+								);
+								Pen.perform(\stroke);
+								// highligh
+								Pen.color = Color.gray(1, 0.15);
+								Pen.addRect(
+									Rect((zoomLo * view.bounds.width), 0, ((zoomHi - zoomLo) * view.bounds.width), view.bounds.height)
+								);
+								Pen.perform(\fill);
+
+							})
+							.refresh
+						}.(),
 						[
 							StackLayout(
 								cuesView = UserView().acceptsMouse_(false),
@@ -1303,7 +1382,7 @@ SFPlayerView {
 
 	prScrollAction {arg updateSlider = false; //called by soundfileview, as well as range slider
 		var view = sfView;
-		var scrollRatio = view.viewFrames/ player.sf.numFrames;
+		var scrollRatio = view.viewFrames / player.sf.numFrames;
 		var start = view.scrollPos.linlin(0, 1, 0, 1 - scrollRatio) * player.sf.duration;
 		var end = start + (scrollRatio * player.sf.duration);
 		var grid = timeGrid.x.grid;
@@ -1312,12 +1391,11 @@ SFPlayerView {
 		timeGrid.horzGrid_(grid);
 		gridView.refresh;
 		cuesView.refresh;
+
 		if(updateSlider, {
-			var rangeSize, rangeStart;
-			//for zoom slider
-			rangeSize = view.xZoom / player.sf.duration;
-			rangeStart = view.scrollPos * (1 - rangeSize);
-			zoomSlider.lo_(rangeStart).range_(rangeSize);
+			zoomLo = start / player.sf.duration; // we should rethink recalculating these...
+			zoomHi = end / player.sf.duration;
+			zoomView.refresh;
 		});
 	}
 
@@ -1461,7 +1539,7 @@ SFPlayerView {
 				gridView.refresh;
 
 				sfView.soundfile_(player.sf);
-				sfView.readWithTask(0, player.sf.numFrames, doneAction: {doneAction.value});
+				sfView.readWithTask(0, player.sf.numFrames, doneAction: {this.prepareZoomImage; doneAction.value});
 				sfView.waveColors_(Array.fill(player.sf.numChannels, skin.sfWaveform));  //set after num channels
 
 				window !? {window.name_(player.path.basename)};
@@ -1470,6 +1548,20 @@ SFPlayerView {
 				this.setTimeString(player.startTime);
 			});
 		})
+	}
+
+	prepareZoomImage {
+		var background, transparent;
+		zoomImage = Image.fromWindow(sfView, Rect(0, 0, sfView.bounds.width, sfView.bounds.height));
+		background = Image.colorToPixel(sfView.background);
+		transparent = Image.colorToPixel(Color.clear);
+
+		zoomImage.width.do({|incW|
+			zoomImage.height.do({|incH|
+				if(zoomImage.getPixel(incW, incH) == background) {zoomImage.setPixel(transparent, incW, incH)}
+			})
+		});
+		zoomView.refresh;
 	}
 
 	update {arg who, what ...args;
