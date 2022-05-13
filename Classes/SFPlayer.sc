@@ -675,6 +675,7 @@ SFPlayerView {
 		timeGrid.font_(Font("Arial", 10));
 		timeGrid.gridColors_([skin.string, nil]);
 		view.onClose_({
+			this.stopGUIRoutine;
 			stopPlayerOnClose.if({player.isPlaying.if({player.stop})});
 			player.removeDependant(this);
 			onCloseAction.();
