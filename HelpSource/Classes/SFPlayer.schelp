@@ -105,7 +105,7 @@ code::
 (
 p = SFPlayer.new(Platform.resourceDir +/+ "sounds/a11wlk01.wav").gui;
 q = SFPlayer.new(Platform.resourceDir +/+ "sounds/a11wlk01-44_1.aiff").gui;
-p.addDependant(q); //p is "master", q is "slave"
+p.addDependant(q); //p is "conductor", q is "follower"
 )
 ::
 
