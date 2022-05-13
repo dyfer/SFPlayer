@@ -1564,7 +1564,9 @@ SFPlayerView {
 
 	prepareZoomImage {
 		var background, transparent;
+		sfView.timeCursorOn_(false); // don't capture the cursor
 		zoomImage = Image.fromWindow(sfView, Rect(0, 0, sfView.bounds.width, sfView.bounds.height));
+		sfView.timeCursorOn_(true);
 		background = Image.colorToPixel(sfView.background);
 		transparent = Image.colorToPixel(Color.clear);
 
