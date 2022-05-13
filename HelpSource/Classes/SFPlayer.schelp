@@ -79,7 +79,12 @@ METHOD:: view
 
 returns:: If the gui was created, this returns an instance of the code::SFPlayerView::.
 
+METHOD:: attRelTime
+Get/Set the time of fade in / fade out when starting/stopping. Increase this value for seamless looping (see below).
+
 subsection:: Looping
+
+note:: For seamless looping, increase code::attRelTime:: and set the code::loopEnd:: parameter to at least code::attRelTime:: less than the soundfile's duration.::
 
 METHOD:: loop
 Turn looping on/off by setting loop to code::true:: or code::false::.
