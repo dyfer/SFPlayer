@@ -1396,6 +1396,10 @@ SFPlayerView {
 			this.playGUIRoutine;
 			playButton.value_(1);
 		};
+		if(player.loopBeginning.notNil && player.loopEnd.notNil) {
+			sfView.setSelectionStart(0, player.loopBeginning * player.sf.sampleRate);
+			sfView.setSelectionSize(0, (player.loopEnd - player.loopBeginning) * player.sf.sampleRate);
+		};
 	}
 
 	prScrollAction {arg updateSlider = false; //called by soundfileview, as well as range slider
