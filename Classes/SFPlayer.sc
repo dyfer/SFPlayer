@@ -1386,6 +1386,10 @@ SFPlayerView {
 		player.addDependant(this);
 		this.loadSF;
 		player.cues !? {this.drawCues};
+		if(player.isPlaying) {
+			this.playGUIRoutine;
+			playButton.value_(1);
+		};
 	}
 
 	prScrollAction {arg updateSlider = false; //called by soundfileview, as well as range slider
