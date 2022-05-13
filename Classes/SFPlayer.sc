@@ -1485,10 +1485,19 @@ SFPlayerView {
 					\target, {targetText.value_(value.asNodeID.asString)},
 					\amp, {
 						if(args[1] != \number, {
-							ampNumber.value_(value.ampdb.round(0.1));
+							if(value.isKindOf(Symbol), {
+								ampNumber.string_(value.asString);
+							}, {
+								ampNumber.value_(value.ampdb.round(0.1));
+							});
 						});
 						if(args[1] != \slider, {
-							ampSlider.value_(ampSpec.unmap(value.ampdb));
+							if(value.isKindOf(Symbol), {
+								ampSlider.enabled_(false);
+							}, {
+								ampSlider.enabled_(true);
+								ampSlider.value_(ampSpec.unmap(value.ampdb));
+							});
 						});
 					},
 					\outbus, {
