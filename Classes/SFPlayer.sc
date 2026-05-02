@@ -584,7 +584,6 @@ SFPlayerView {
 	var cueOffsetNum, cueMenu;
 	var scope;
 	var <timeString, <timeStringSm, <sfView, <cuesView, <gridView, <timeGrid, <zoomView, <zoomImage, guiRoutine, <filenameString;
-	var <skin;
 	var <zoomLo = 0, <zoomHi = 1; // for overview on top; normalized
 	var zoomHandlePx = 8;
 	// var tempBounds, tempAction;
